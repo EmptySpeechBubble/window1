@@ -1232,6 +1232,14 @@ let rainbowsShown = 0; // Track number of rainbows that have appeared
         // Ground/air physics constants
         const GROUND_Y_THRESHOLD = 10; // How close to ground to trigger ground phase
 
+        // Chirping/calling constants
+        const CHIRP_DURATION = 1500; // How long chirp visual lasts (ms)
+        const CHIRP_COOLDOWN = 3000; // Minimum time between chirps (ms)
+        const CHIRP_CHANCE_PERCHED = 0.005; // Chance per frame when perched
+        const CHIRP_CHANCE_TERRITORIAL = 0.8; // High chance during territorial display
+        const CHIRP_CHANCE_ALERT = 0.9; // Very high chance when alerting
+        const CHIRP_CHANCE_SOCIAL = 0.3; // Moderate chance during social interactions
+
         // Bird types for variety
         const BIRD_TYPES = [
             {
@@ -4520,11 +4528,11 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                 // Social foraging
                 this.followingBird = null; // Bird being followed to food
 
-                // In the Bird class update method
-                if (this.y > canvas.height * GROUND_HEIGHT_RATIO) {
-                    this.y = canvas.height * GROUND_HEIGHT_RATIO;
-                    this.velocity.y = 0; // Stop when hitting the ground
-                }
+                // Chirping/calling system
+                this.chirping = false;
+                this.chirpTimer = 0;
+                this.lastChirpTime = Date.now();
+                this.chirpNotes = []; // Visual chirp indicators
             }
 
             applyForce(force) {
@@ -5605,6 +5613,103 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                 }
             }
 
+            // Chirping/Calling System
+            triggerChirp(type = 'normal') {
+                const now = Date.now();
+
+                // Check cooldown
+                if (now - this.lastChirpTime < CHIRP_COOLDOWN) {
+                    return;
+                }
+
+                // Create visual chirp notes
+                const noteCount = type === 'alert' ? 3 : (type === 'territorial' ? 2 : 1);
+
+                for (let i = 0; i < noteCount; i++) {
+                    const note = {
+                        x: this.x + (Math.random() - 0.5) * 10,
+                        y: this.y - 15 - (i * 8),
+                        size: 8 + Math.random() * 4,
+                        opacity: 1.0,
+                        lifetime: 0,
+                        maxLifetime: CHIRP_DURATION,
+                        velocityX: (Math.random() - 0.5) * 0.5,
+                        velocityY: -0.5 - Math.random() * 0.5,
+                        type: type, // normal, territorial, alert, social
+                        rotation: Math.random() * Math.PI * 2
+                    };
+                    this.chirpNotes.push(note);
+                }
+
+                this.chirping = true;
+                this.chirpTimer = 0;
+                this.lastChirpTime = now;
+
+                debugLog(`${this.birdType.name} chirped (${type})`);
+            }
+
+            updateChirps(deltaTime) {
+                // Update chirp timer
+                if (this.chirping) {
+                    this.chirpTimer += deltaTime;
+                    if (this.chirpTimer > 500) { // Chirp animation lasts 500ms
+                        this.chirping = false;
+                    }
+                }
+
+                // Update chirp notes
+                for (let i = this.chirpNotes.length - 1; i >= 0; i--) {
+                    const note = this.chirpNotes[i];
+                    note.lifetime += deltaTime;
+
+                    // Move note
+                    note.x += note.velocityX;
+                    note.y += note.velocityY;
+                    note.rotation += 0.05;
+
+                    // Fade out
+                    note.opacity = 1.0 - (note.lifetime / note.maxLifetime);
+
+                    // Remove expired notes
+                    if (note.lifetime >= note.maxLifetime) {
+                        this.chirpNotes.splice(i, 1);
+                    }
+                }
+            }
+
+            checkForChirpOpportunities() {
+                const now = Date.now();
+
+                // Can't chirp if on cooldown
+                if (now - this.lastChirpTime < CHIRP_COOLDOWN) {
+                    return;
+                }
+
+                // Chirp when perched (peaceful chirping)
+                if (this.state === BIRD_STATES.PERCHED && Math.random() < CHIRP_CHANCE_PERCHED) {
+                    this.triggerChirp('normal');
+                    return;
+                }
+
+                // Chirp during territorial display
+                if (this.territorialWarning && Math.random() < CHIRP_CHANCE_TERRITORIAL) {
+                    this.triggerChirp('territorial');
+                    return;
+                }
+
+                // Chirp when alerting
+                if (this.isAlerting && Math.random() < CHIRP_CHANCE_ALERT) {
+                    this.triggerChirp('alert');
+                    return;
+                }
+
+                // Chirp during social interactions (near flockmates)
+                if (this.flockmates && this.flockmates.length >= 3 && Math.random() < CHIRP_CHANCE_SOCIAL) {
+                    this.triggerChirp('social');
+                    return;
+                }
+            }
+
             update(deltaTime) {
                 // Update wingflap with slower movement for calmer appearance
                 if (this.state === BIRD_STATES.FLYING || this.state === BIRD_STATES.FLEEING || 
@@ -5652,6 +5757,8 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                 this.updateTerritorialBehavior(deltaTime); // Territorial behavior
                 this.updateAlert(deltaTime); // Predator alert timer
                 this.updateFoodMemory(); // Clean up old food memories
+                this.updateChirps(deltaTime); // Update chirp visuals
+                this.checkForChirpOpportunities(); // Check if bird should chirp
 
                 // Check for predators (prioritize over other behaviors)
                 if (this.checkForPredators()) {
@@ -5737,10 +5844,9 @@ if (this.state === BIRD_STATES.FLYING) {
                         // Apply air resistance
                         this.velocity.x *= AIR_RESISTANCE;
                         this.velocity.y *= AIR_RESISTANCE;
-                        
-                        // Apply slight gravity
-                        this.applyForce({ x: 0, y: GRAVITY });
-                        
+
+                        // Gravity is now handled by updateGroundAirPhysics()
+
                         // Check for baby birds needing feeding - higher priority than hunger
                         if (!this.isWild && babyBirds.length > 0 && Math.random() < 0.05) {
                             // Check more frequently for babies that need feeding
@@ -6785,15 +6891,14 @@ if (this.pathIndex >= this.path.length) {
                             // No path, just fly naturally
                             // Apply a small random force
                             if (Math.random() < 0.1) {
-                                this.applyForce({ 
+                                this.applyForce({
                                     x: (Math.random() - 0.5) * 0.02,
                                     y: (Math.random() - 0.5) * 0.01
                                 });
                             }
-                            
-                            // Apply a slight gravity
-                            this.applyForce({ x: 0, y: GRAVITY * 0.5 });
-                            
+
+                            // Gravity is now handled by updateGroundAirPhysics()
+
                             // Check for state transitions
                             if (this.stateTimer > Math.max(MIN_STATE_DURATION, BIRD_STATE_DURATION.FLYING)) {
                                 // Choose a new random activity
@@ -7279,19 +7384,43 @@ ctx.arc(
 );
 ctx.fill();
                 
-                // Draw beak
+                // Draw beak (opens when chirping)
+                const beakOpen = this.chirping ? 3 * sizeMultiplier : 0;
                 ctx.fillStyle = this.pecking ? '#FF8800' : '#FFAA00';
-                ctx.beginPath();
+
                 if (this.direction > 0) {
-                    ctx.moveTo(this.x + 12 * sizeMultiplier, this.y - 3 * sizeMultiplier + yOffset);
-                    ctx.lineTo(this.x + 18 * sizeMultiplier, this.y - 2 * sizeMultiplier + yOffset);
-                    ctx.lineTo(this.x + 12 * sizeMultiplier, this.y + yOffset);
+                    // Upper beak
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + 12 * sizeMultiplier, this.y - 3 * sizeMultiplier + yOffset - beakOpen / 2);
+                    ctx.lineTo(this.x + 18 * sizeMultiplier, this.y - 2 * sizeMultiplier + yOffset - beakOpen / 2);
+                    ctx.lineTo(this.x + 12 * sizeMultiplier, this.y - 1 * sizeMultiplier + yOffset - beakOpen / 2);
+                    ctx.fill();
+
+                    // Lower beak (when chirping)
+                    if (this.chirping) {
+                        ctx.beginPath();
+                        ctx.moveTo(this.x + 12 * sizeMultiplier, this.y - 1 * sizeMultiplier + yOffset + beakOpen / 2);
+                        ctx.lineTo(this.x + 18 * sizeMultiplier, this.y - 2 * sizeMultiplier + yOffset + beakOpen / 2);
+                        ctx.lineTo(this.x + 12 * sizeMultiplier, this.y + 1 * sizeMultiplier + yOffset + beakOpen / 2);
+                        ctx.fill();
+                    }
                 } else {
-                    ctx.moveTo(this.x - 12 * sizeMultiplier, this.y - 3 * sizeMultiplier + yOffset);
-                    ctx.lineTo(this.x - 18 * sizeMultiplier, this.y - 2 * sizeMultiplier + yOffset);
-                    ctx.lineTo(this.x - 12 * sizeMultiplier, this.y + yOffset);
+                    // Upper beak
+                    ctx.beginPath();
+                    ctx.moveTo(this.x - 12 * sizeMultiplier, this.y - 3 * sizeMultiplier + yOffset - beakOpen / 2);
+                    ctx.lineTo(this.x - 18 * sizeMultiplier, this.y - 2 * sizeMultiplier + yOffset - beakOpen / 2);
+                    ctx.lineTo(this.x - 12 * sizeMultiplier, this.y - 1 * sizeMultiplier + yOffset - beakOpen / 2);
+                    ctx.fill();
+
+                    // Lower beak (when chirping)
+                    if (this.chirping) {
+                        ctx.beginPath();
+                        ctx.moveTo(this.x - 12 * sizeMultiplier, this.y - 1 * sizeMultiplier + yOffset + beakOpen / 2);
+                        ctx.lineTo(this.x - 18 * sizeMultiplier, this.y - 2 * sizeMultiplier + yOffset + beakOpen / 2);
+                        ctx.lineTo(this.x - 12 * sizeMultiplier, this.y + 1 * sizeMultiplier + yOffset + beakOpen / 2);
+                        ctx.fill();
+                    }
                 }
-                ctx.fill();
                 
                 // Eyes with pupil and highlight for cuter appearance
                 ctx.fillStyle = 'black';
@@ -7465,6 +7594,70 @@ ctx.stroke();
                         ctx.font = '7px Arial';
                         ctx.fillText('GROUND', this.x - 14, this.y + 20);
                     }
+                }
+
+                // Draw chirp notes (visible to all, not just debug mode)
+                this.drawChirpNotes();
+            }
+
+            // Draw chirp notes with music note symbols
+            drawChirpNotes() {
+                for (const note of this.chirpNotes) {
+                    ctx.save();
+                    ctx.globalAlpha = note.opacity;
+                    ctx.translate(note.x, note.y);
+                    ctx.rotate(note.rotation);
+
+                    // Choose color based on chirp type
+                    let noteColor;
+                    switch (note.type) {
+                        case 'alert':
+                            noteColor = '#FF6B6B'; // Red for alerts
+                            break;
+                        case 'territorial':
+                            noteColor = '#FFA500'; // Orange for territorial
+                            break;
+                        case 'social':
+                            noteColor = '#4ECDC4'; // Teal for social
+                            break;
+                        default:
+                            noteColor = '#95E1D3'; // Light blue for normal
+                    }
+
+                    // Draw music note symbol
+                    ctx.font = `bold ${note.size}px Arial`;
+                    ctx.fillStyle = noteColor;
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                    ctx.lineWidth = 1;
+
+                    // Different symbols for different chirp types
+                    let symbol;
+                    switch (note.type) {
+                        case 'alert':
+                            symbol = '♪♪♪'; // Triple notes for alert
+                            break;
+                        case 'territorial':
+                            symbol = '♫'; // Beamed notes for territorial
+                            break;
+                        case 'social':
+                            symbol = '♪'; // Single note for social
+                            break;
+                        default:
+                            symbol = '♪'; // Single note for normal
+                    }
+
+                    ctx.strokeText(symbol, -note.size / 2, 0);
+                    ctx.fillText(symbol, -note.size / 2, 0);
+
+                    // Add a subtle glow for alerts
+                    if (note.type === 'alert') {
+                        ctx.shadowColor = noteColor;
+                        ctx.shadowBlur = 5;
+                        ctx.fillText(symbol, -note.size / 2, 0);
+                        ctx.shadowBlur = 0;
+                    }
+
+                    ctx.restore();
                 }
             }
         }
