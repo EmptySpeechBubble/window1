@@ -1211,6 +1211,27 @@ let rainbowsShown = 0; // Track number of rainbows that have appeared
         
         const BIRDHOUSE_MATERIALS_NEEDED = 5;
 
+        // Flocking behavior constants
+        const FLOCK_SEPARATION_RADIUS = 25; // Prevent overcrowding
+        const FLOCK_ALIGNMENT_RADIUS = 60; // Match nearby birds' velocity
+        const FLOCK_COHESION_RADIUS = 80; // Steer toward flock center
+        const MAX_FLOCK_SIZE = 7; // Maximum birds to consider for flocking
+        const FLOCK_SEPARATION_WEIGHT = 1.5;
+        const FLOCK_ALIGNMENT_WEIGHT = 1.0;
+        const FLOCK_COHESION_WEIGHT = 1.0;
+
+        // Territorial behavior constants
+        const FOOD_DEFENSE_RADIUS = 40; // Food protection zone
+        const NEST_DEFENSE_RADIUS = 60; // Nest protection zone with increased aggression
+        const TERRITORY_WARNING_DURATION = 2000; // Warning display lasts 2 seconds
+
+        // Food memory constants
+        const FOOD_MEMORY_DURATION = 60000; // 1 minute
+        const FOOD_MEMORY_RETURN_CHANCE = 0.3; // 30% chance to return
+
+        // Ground/air physics constants
+        const GROUND_Y_THRESHOLD = 10; // How close to ground to trigger ground phase
+
         // Bird types for variety
         const BIRD_TYPES = [
             {
@@ -1222,7 +1243,9 @@ let rainbowsShown = 0; // Track number of rainbows that have appeared
                 sizeMultiplier: 1.0,
                 speedMultiplier: 1.1,
                 glideRatio: 0.3,
-                wingFlapAmplitude: 1.0
+                wingFlapAmplitude: 1.0,
+                aggression: 0.4, // Moderate territorial behavior
+                flockingTendency: 0.75 // Tend to flock together
             },
             {
                 name: "Cardinal",
@@ -1233,7 +1256,9 @@ let rainbowsShown = 0; // Track number of rainbows that have appeared
                 sizeMultiplier: 1.05,
                 speedMultiplier: 1.0,
                 glideRatio: 0.2,
-                wingFlapAmplitude: 1.2
+                wingFlapAmplitude: 1.2,
+                aggression: 0.7, // Most aggressive species
+                flockingTendency: 0.5 // Moderate flocking behavior
             },
             {
                 name: "Canary",
@@ -1244,7 +1269,9 @@ let rainbowsShown = 0; // Track number of rainbows that have appeared
                 sizeMultiplier: 0.9,
                 speedMultiplier: 1.2,
                 glideRatio: 0.25,
-                wingFlapAmplitude: 1.3
+                wingFlapAmplitude: 1.3,
+                aggression: 0.2, // Least aggressive species
+                flockingTendency: 0.6 // Moderate flocking
             },
             {
                 name: "Sparrow",
@@ -1255,7 +1282,9 @@ let rainbowsShown = 0; // Track number of rainbows that have appeared
                 sizeMultiplier: 0.85,
                 speedMultiplier: 1.15,
                 glideRatio: 0.2,
-                wingFlapAmplitude: 1.4
+                wingFlapAmplitude: 1.4,
+                aggression: 0.35, // Low to moderate aggression
+                flockingTendency: 0.95 // Highest flocking tendency
             },
             {
                 name: "Finch",
@@ -1266,7 +1295,9 @@ let rainbowsShown = 0; // Track number of rainbows that have appeared
                 sizeMultiplier: 0.8,
                 speedMultiplier: 1.25,
                 glideRatio: 0.15,
-                wingFlapAmplitude: 1.5
+                wingFlapAmplitude: 1.5,
+                aggression: 0.3, // Low aggression
+                flockingTendency: 0.8 // High flocking tendency
             }
         ];
 
@@ -4458,9 +4489,36 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                 this.nestFindAttempts = 0;
                 this.buildingBirdhouse = null;
                 this.lastNestCheckTime = 0; // For nest maintenance system
-                
+
                 // Add directionChangeCooldown property
                 this.directionChangeCooldown = 0;
+
+                // Ground/air physics properties
+                this.isOnGround = false;
+                this.groundPhase = false; // Explicit ground phase flag
+                this.groundPosition = { x: 0, y: 0 }; // Locked position during ground phase
+
+                // Flocking behavior properties
+                this.flockmates = []; // Nearby birds of same species
+                this.flockCenter = { x: 0, y: 0 };
+
+                // Territorial behavior properties
+                this.defendedFood = null; // Food item being defended
+                this.territorialWarning = false; // Display warning
+                this.territorialWarningTimer = 0;
+                this.lastTerritorialCheck = 0;
+
+                // Food memory system
+                this.foodMemory = []; // Array of {x, y, timestamp}
+                this.lastFoodMemoryCleanup = Date.now();
+
+                // Predator alert system
+                this.isAlerting = false;
+                this.alertTimer = 0;
+                this.alertSource = null; // Source of danger
+
+                // Social foraging
+                this.followingBird = null; // Bird being followed to food
 
                 // In the Bird class update method
                 if (this.y > canvas.height * GROUND_HEIGHT_RATIO) {
@@ -4716,11 +4774,16 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
             }
 
             findFoodSource() {
+                // Try recalling a previous food location first
+                if (this.tryRecallFoodLocation()) {
+                    return; // Successfully recalled a food spot
+                }
+
                 // Try to find food or worms
                 let foundFood = false;
-                
+
                 // Expanded vision radius when hungry
-                const visionRadius = this.hunger > HUNGER_CRITICAL_THRESHOLD ? 
+                const visionRadius = this.hunger > HUNGER_CRITICAL_THRESHOLD ?
                     BIRD_FOOD_VISION_RADIUS * 2 : BIRD_FOOD_VISION_RADIUS * 1.5;
                 
                 // Target worms first (more nutritious)
@@ -5184,19 +5247,362 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                 const dx = this.x - threatX;
                 const dy = this.y - threatY;
                 const dir = normalize(dx, dy);
-                
+
                 // Set fleeing state
                 this.state = BIRD_STATES.FLEEING;
                 this.stateTimer = 0;
-                
+
                 // Apply immediate force away from threat
                 this.velocity.x = dir.x * this.baseSpeed * 2;
                 this.velocity.y = dir.y * this.baseSpeed * 1.5 - 1; // Upward bias
-                
+
                 // Set direction faced
                 this.direction = dx > 0 ? 1 : -1;
-                
+
                 debugLog(`Bird fleeing from threat at (${threatX}, ${threatY})`);
+            }
+
+            // Ground/Air Physics System
+            updateGroundAirPhysics() {
+                const groundY = canvas.height * GROUND_HEIGHT_RATIO;
+                const distToGround = groundY - this.y;
+
+                // Check if bird should be in ground phase
+                if (distToGround <= GROUND_Y_THRESHOLD && Math.abs(this.velocity.y) < 0.5) {
+                    if (!this.groundPhase) {
+                        // Entering ground phase
+                        this.groundPhase = true;
+                        this.isOnGround = true;
+                        this.y = groundY; // Lock to ground level
+                        this.groundPosition = { x: this.x, y: this.y };
+                        this.velocity.y = 0; // Stop vertical movement
+                        debugLog(`${this.birdType.name} entered ground phase at (${this.x}, ${this.y})`);
+                    }
+
+                    // During ground phase - no gravity, maintain ground position
+                    this.y = groundY;
+                    this.velocity.y = 0;
+
+                    // Can still move horizontally on ground (hopping/walking)
+                    if (this.state === BIRD_STATES.HOPPING || this.state === BIRD_STATES.FEEDING) {
+                        // Allow horizontal movement
+                        this.velocity.x *= 0.9; // Ground friction
+                    } else {
+                        // Minimal drift
+                        this.velocity.x *= 0.95;
+                    }
+                } else {
+                    // Air phase - apply gravity normally
+                    if (this.groundPhase) {
+                        // Exiting ground phase
+                        this.groundPhase = false;
+                        this.isOnGround = false;
+                        debugLog(`${this.birdType.name} exited ground phase - entering air phase`);
+                    }
+
+                    // Apply gravity only in air phase
+                    if (!this.groundPhase) {
+                        this.applyForce({ x: 0, y: GRAVITY });
+                    }
+                }
+            }
+
+            // Flocking Behavior System
+            updateFlocking() {
+                // Only apply flocking when flying or in certain states
+                if (this.state !== BIRD_STATES.FLYING && this.state !== BIRD_STATES.IDLE) {
+                    return;
+                }
+
+                // Check if this bird should flock based on tendency
+                if (Math.random() > this.birdType.flockingTendency) {
+                    return; // Skip flocking this frame
+                }
+
+                // Find nearby birds of the same species
+                this.flockmates = [];
+                for (const other of birds) {
+                    if (other === this || other.birdType.name !== this.birdType.name) continue;
+
+                    const dist = distance(this.x, this.y, other.x, other.y);
+                    if (dist < FLOCK_COHESION_RADIUS && this.flockmates.length < MAX_FLOCK_SIZE) {
+                        this.flockmates.push({ bird: other, distance: dist });
+                    }
+                }
+
+                if (this.flockmates.length === 0) return;
+
+                // Calculate flocking forces
+                let separation = { x: 0, y: 0 };
+                let alignment = { x: 0, y: 0 };
+                let cohesion = { x: 0, y: 0 };
+
+                let separationCount = 0;
+                let alignmentCount = 0;
+                let cohesionCount = 0;
+
+                for (const flockmate of this.flockmates) {
+                    const other = flockmate.bird;
+                    const dist = flockmate.distance;
+
+                    // Separation - avoid crowding
+                    if (dist < FLOCK_SEPARATION_RADIUS && dist > 0) {
+                        const diff = {
+                            x: this.x - other.x,
+                            y: this.y - other.y
+                        };
+                        const normalized = normalize(diff.x, diff.y);
+                        separation.x += normalized.x / dist; // Closer = stronger push
+                        separation.y += normalized.y / dist;
+                        separationCount++;
+                    }
+
+                    // Alignment - match velocity
+                    if (dist < FLOCK_ALIGNMENT_RADIUS) {
+                        alignment.x += other.velocity.x;
+                        alignment.y += other.velocity.y;
+                        alignmentCount++;
+                    }
+
+                    // Cohesion - steer toward center
+                    if (dist < FLOCK_COHESION_RADIUS) {
+                        cohesion.x += other.x;
+                        cohesion.y += other.y;
+                        cohesionCount++;
+                    }
+                }
+
+                // Average and apply forces
+                if (separationCount > 0) {
+                    separation.x /= separationCount;
+                    separation.y /= separationCount;
+                    this.applyForce({
+                        x: separation.x * FLOCK_SEPARATION_WEIGHT * 0.01,
+                        y: separation.y * FLOCK_SEPARATION_WEIGHT * 0.01
+                    });
+                }
+
+                if (alignmentCount > 0) {
+                    alignment.x /= alignmentCount;
+                    alignment.y /= alignmentCount;
+                    const alignForce = {
+                        x: (alignment.x - this.velocity.x) * FLOCK_ALIGNMENT_WEIGHT * 0.01,
+                        y: (alignment.y - this.velocity.y) * FLOCK_ALIGNMENT_WEIGHT * 0.01
+                    };
+                    this.applyForce(alignForce);
+                }
+
+                if (cohesionCount > 0) {
+                    cohesion.x /= cohesionCount;
+                    cohesion.y /= cohesionCount;
+                    this.flockCenter = { x: cohesion.x, y: cohesion.y };
+
+                    const desired = {
+                        x: cohesion.x - this.x,
+                        y: cohesion.y - this.y
+                    };
+                    const normalized = normalize(desired.x, desired.y);
+                    this.applyForce({
+                        x: normalized.x * FLOCK_COHESION_WEIGHT * 0.01,
+                        y: normalized.y * FLOCK_COHESION_WEIGHT * 0.01
+                    });
+                }
+            }
+
+            // Territorial Behavior System
+            updateTerritorialBehavior(deltaTime) {
+                // Update territorial warning timer
+                if (this.territorialWarning) {
+                    this.territorialWarningTimer += deltaTime;
+                    if (this.territorialWarningTimer > TERRITORY_WARNING_DURATION) {
+                        this.territorialWarning = false;
+                        this.territorialWarningTimer = 0;
+                    }
+                }
+
+                // Throttle territorial checks
+                const now = Date.now();
+                if (now - this.lastTerritorialCheck < 500) return;
+                this.lastTerritorialCheck = now;
+
+                // Defend food resources
+                if (this.defendedFood || (this.target && this.target.type === 'food')) {
+                    const foodToDefend = this.defendedFood || this.target.food;
+
+                    if (foodToDefend && foodItems.includes(foodToDefend)) {
+                        for (const other of birds) {
+                            if (other === this) continue;
+
+                            const distToFood = distance(other.x, other.y, foodToDefend.x, foodToDefend.y);
+                            if (distToFood < FOOD_DEFENSE_RADIUS) {
+                                // Calculate if we should challenge
+                                const ourAggression = this.birdType.aggression;
+                                const theirAggression = other.birdType.aggression;
+
+                                if (ourAggression > theirAggression) {
+                                    // We're more aggressive - drive them away
+                                    this.territorialWarning = true;
+                                    this.territorialWarningTimer = 0;
+
+                                    // Make the other bird flee if they're less aggressive
+                                    if (Math.random() < (ourAggression - theirAggression)) {
+                                        other.flee(this.x, this.y);
+                                        debugLog(`${this.birdType.name} drove away ${other.birdType.name} from food`);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (!this.defendedFood) {
+                            this.defendedFood = foodToDefend;
+                        }
+                    } else {
+                        this.defendedFood = null; // Food gone
+                    }
+                }
+
+                // Defend nest with increased aggression
+                if (this.myNest && nests.includes(this.myNest)) {
+                    const nestDefenseAggression = this.birdType.aggression * 1.5; // Increased aggression near nest
+
+                    for (const other of birds) {
+                        if (other === this) continue;
+
+                        const distToNest = distance(other.x, other.y, this.myNest.x, this.myNest.y);
+                        if (distToNest < NEST_DEFENSE_RADIUS) {
+                            // More aggressive near nest
+                            if (Math.random() < nestDefenseAggression) {
+                                this.territorialWarning = true;
+                                this.territorialWarningTimer = 0;
+                                other.flee(this.x, this.y);
+                                debugLog(`${this.birdType.name} defending nest from ${other.birdType.name}`);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Predator Alert System
+            checkForPredators() {
+                // Check for owls (predators)
+                for (const owl of owls) {
+                    const distToOwl = distance(this.x, this.y, owl.x, owl.y);
+
+                    if (distToOwl < 200) { // Detection radius
+                        this.triggerAlert(owl.x, owl.y);
+
+                        // Cascading alert to nearby birds
+                        for (const other of birds) {
+                            if (other === this) continue;
+
+                            const distToOther = distance(this.x, this.y, other.x, other.y);
+                            if (distToOther < 150) { // Alert propagation radius
+                                other.triggerAlert(owl.x, owl.y);
+                            }
+                        }
+
+                        // Flee from predator
+                        this.flee(owl.x, owl.y);
+                        return true;
+                    }
+                }
+
+                // Check for scarecrow
+                if (scarecrow) {
+                    const distToScarecrow = distance(this.x, this.y, scarecrow.x, scarecrow.y);
+
+                    if (distToScarecrow < 150) {
+                        this.triggerAlert(scarecrow.x, scarecrow.y);
+                        this.flee(scarecrow.x, scarecrow.y);
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            triggerAlert(sourceX, sourceY) {
+                this.isAlerting = true;
+                this.alertTimer = 0;
+                this.alertSource = { x: sourceX, y: sourceY };
+            }
+
+            updateAlert(deltaTime) {
+                if (this.isAlerting) {
+                    this.alertTimer += deltaTime;
+                    if (this.alertTimer > 3000) { // Alert lasts 3 seconds
+                        this.isAlerting = false;
+                        this.alertTimer = 0;
+                        this.alertSource = null;
+                    }
+                }
+            }
+
+            // Food Memory System
+            updateFoodMemory() {
+                const now = Date.now();
+
+                // Clean up old memories
+                if (now - this.lastFoodMemoryCleanup > 10000) { // Every 10 seconds
+                    this.foodMemory = this.foodMemory.filter(memory =>
+                        now - memory.timestamp < FOOD_MEMORY_DURATION
+                    );
+                    this.lastFoodMemoryCleanup = now;
+                }
+            }
+
+            rememberFoodLocation(x, y) {
+                const now = Date.now();
+                this.foodMemory.push({ x, y, timestamp: now });
+
+                // Limit memory size
+                if (this.foodMemory.length > 5) {
+                    this.foodMemory.shift(); // Remove oldest
+                }
+            }
+
+            tryRecallFoodLocation() {
+                if (this.foodMemory.length === 0) return false;
+
+                if (Math.random() < FOOD_MEMORY_RETURN_CHANCE) {
+                    // Pick a random remembered location
+                    const memory = this.foodMemory[Math.floor(Math.random() * this.foodMemory.length)];
+
+                    // Go to that location
+                    this.generatePath(memory.x, memory.y);
+                    this.state = BIRD_STATES.FLYING;
+                    debugLog(`${this.birdType.name} recalling food location at (${memory.x}, ${memory.y})`);
+                    return true;
+                }
+
+                return false;
+            }
+
+            // Social Foraging System
+            updateSocialForaging() {
+                // If not looking for food, don't follow others
+                if (this.hunger < HUNGER_CRITICAL_THRESHOLD - 100) {
+                    this.followingBird = null;
+                    return;
+                }
+
+                // Look for birds that are eating or heading to food
+                for (const other of birds) {
+                    if (other === this || other.birdType.name !== this.birdType.name) continue;
+
+                    const distToOther = distance(this.x, this.y, other.x, other.y);
+
+                    // If nearby bird is feeding, follow them
+                    if (distToOther < 200 && other.state === BIRD_STATES.FEEDING) {
+                        this.followingBird = other;
+
+                        // Head toward the feeding bird
+                        this.generatePath(other.x + (Math.random() - 0.5) * 30, other.y);
+                        this.state = BIRD_STATES.FLYING;
+                        debugLog(`${this.birdType.name} following ${other.birdType.name} to food`);
+                        return;
+                    }
+                }
             }
 
             update(deltaTime) {
@@ -5236,10 +5642,27 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                 }
                 
                 this.stateTimer += deltaTime;
-                
+
                 // Reset acceleration each frame
                 this.acceleration = { x: 0, y: 0 };
-                
+
+                // NEW BEHAVIOR SYSTEMS - Update these before state logic
+                this.updateGroundAirPhysics(); // Ground/air physics with proper phase separation
+                this.updateFlocking(); // Flocking behavior
+                this.updateTerritorialBehavior(deltaTime); // Territorial behavior
+                this.updateAlert(deltaTime); // Predator alert timer
+                this.updateFoodMemory(); // Clean up old food memories
+
+                // Check for predators (prioritize over other behaviors)
+                if (this.checkForPredators()) {
+                    return false; // Fleeing from predator - skip other updates
+                }
+
+                // Social foraging (when hungry)
+                if (this.hunger > HUNGER_CRITICAL_THRESHOLD - 50 && Math.random() < 0.1) {
+                    this.updateSocialForaging();
+                }
+
                 // Check if non-wild bird has a nest that needs maintenance
                 if (!this.isWild && this.myNest && this.myNest.needsMaintenance && 
                     this.state !== BIRD_STATES.BUILDING && Math.random() < 0.02) {
@@ -5574,6 +5997,7 @@ if ((isRaining || timeOfDay >= 1) && Math.random() < 0.4) { // 40% chance to see
                                 }
                                 // Worms are more nutritious
                                 this.hunger = Math.max(0, this.hunger - 150); // Increased from 120
+                                this.rememberFoodLocation(this.target.x, this.target.y); // Remember this location
                                 debugLog(`Bird ate worm at (${this.target.x}, ${this.target.y})`);
                             } else if (this.target.type === 'food') {
                                 const foodIndex = foodItems.indexOf(this.target.food);
@@ -5581,6 +6005,7 @@ if ((isRaining || timeOfDay >= 1) && Math.random() < 0.4) { // 40% chance to see
                                     foodItems.splice(foodIndex, 1);
                                 }
                                 this.hunger = Math.max(0, this.hunger - 100); // Increased from 80
+                                this.rememberFoodLocation(this.target.x, this.target.y); // Remember this location
                                 debugLog(`Bird ate food at (${this.target.x}, ${this.target.y})`);
                             } else if (this.target.type === 'baby') {
                                 // Handle feeding baby birds with improved behavior
@@ -6919,16 +7344,127 @@ ctx.lineWidth = 2;  // Make the line thicker
 ctx.beginPath();
 ctx.arc(this.x, this.y, BIRD_VISION_RADIUS, 0, Math.PI * 2);
 ctx.stroke();
-                    
+
                     // Hunger bar
                     const hungerRatio = this.hunger / BIRD_MAX_HUNGER;
                     ctx.fillStyle = hungerRatio > 0.7 ? 'red' : (hungerRatio > 0.4 ? 'yellow' : 'green');
                     ctx.fillRect(this.x - 10, this.y - 15, 20 * hungerRatio, 3);
-                    
+
                     // State text
                     ctx.fillStyle = 'white';
                     ctx.font = '8px Arial';
                     ctx.fillText(this.state, this.x - 10, this.y - 20);
+
+                    // NEW DEBUG VISUALIZATIONS
+
+                    // 1. Flocking connections (blue lines)
+                    if (this.flockmates && this.flockmates.length > 0) {
+                        ctx.strokeStyle = 'rgba(0, 150, 255, 0.5)';
+                        ctx.lineWidth = 1;
+                        for (const flockmate of this.flockmates) {
+                            ctx.beginPath();
+                            ctx.moveTo(this.x, this.y);
+                            ctx.lineTo(flockmate.bird.x, flockmate.bird.y);
+                            ctx.stroke();
+                        }
+
+                        // Flock center indicator
+                        if (this.flockCenter) {
+                            ctx.fillStyle = 'rgba(0, 150, 255, 0.3)';
+                            ctx.beginPath();
+                            ctx.arc(this.flockCenter.x, this.flockCenter.y, 5, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+
+                    // 2. Territorial boundaries (red circles)
+                    if (this.defendedFood && foodItems.includes(this.defendedFood)) {
+                        ctx.strokeStyle = 'rgba(255, 0, 0, 0.6)';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(this.defendedFood.x, this.defendedFood.y, FOOD_DEFENSE_RADIUS, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+
+                    if (this.myNest && nests.includes(this.myNest)) {
+                        ctx.strokeStyle = 'rgba(255, 100, 0, 0.6)';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(this.myNest.x, this.myNest.y, NEST_DEFENSE_RADIUS, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+
+                    // 3. Bird type and aggression indicator
+                    ctx.fillStyle = 'black';
+                    ctx.fillRect(this.x - 15, this.y - 28, 30, 10); // Background for text
+                    ctx.fillStyle = 'white';
+                    ctx.font = 'bold 9px Arial';
+                    const birdLabel = `${this.birdType.name[0]}${(this.birdType.aggression * 10).toFixed(0)}`;
+                    ctx.fillText(birdLabel, this.x - 12, this.y - 22);
+
+                    // 4. Territorial warning display
+                    if (this.territorialWarning) {
+                        ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, 20, 0, Math.PI * 2);
+                        ctx.stroke();
+
+                        // Draw warning symbol
+                        ctx.fillStyle = 'red';
+                        ctx.font = 'bold 12px Arial';
+                        ctx.fillText('!', this.x - 3, this.y - 25);
+                    }
+
+                    // 5. Alert indicator for predator warnings
+                    if (this.isAlerting) {
+                        ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
+                        ctx.font = 'bold 14px Arial';
+                        ctx.fillText('⚠', this.x - 7, this.y - 30);
+
+                        // Draw line to alert source
+                        if (this.alertSource) {
+                            ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+                            ctx.lineWidth = 2;
+                            ctx.setLineDash([5, 5]);
+                            ctx.beginPath();
+                            ctx.moveTo(this.x, this.y);
+                            ctx.lineTo(this.alertSource.x, this.alertSource.y);
+                            ctx.stroke();
+                            ctx.setLineDash([]); // Reset dash
+                        }
+                    }
+
+                    // 6. Food memory locations
+                    if (this.foodMemory && this.foodMemory.length > 0) {
+                        ctx.fillStyle = 'rgba(100, 200, 100, 0.4)';
+                        for (const memory of this.foodMemory) {
+                            ctx.beginPath();
+                            ctx.arc(memory.x, memory.y, 8, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+
+                    // 7. Social foraging indicator
+                    if (this.followingBird && birds.includes(this.followingBird)) {
+                        ctx.strokeStyle = 'rgba(0, 255, 0, 0.6)';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([3, 3]);
+                        ctx.beginPath();
+                        ctx.moveTo(this.x, this.y);
+                        ctx.lineTo(this.followingBird.x, this.followingBird.y);
+                        ctx.stroke();
+                        ctx.setLineDash([]); // Reset dash
+                    }
+
+                    // 8. Ground phase indicator
+                    if (this.groundPhase) {
+                        ctx.fillStyle = 'rgba(139, 69, 19, 0.5)';
+                        ctx.fillRect(this.x - 12, this.y + 10, 24, 3);
+                        ctx.fillStyle = 'white';
+                        ctx.font = '7px Arial';
+                        ctx.fillText('GROUND', this.x - 14, this.y + 20);
+                    }
                 }
             }
         }
