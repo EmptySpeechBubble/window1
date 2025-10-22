@@ -392,6 +392,7 @@ let narrativeTimer = 0;
 let narrativeText = '';
 let chibiAnimFrame = 0;
 let chibiState = 'idle_happy';
+let lastBuildingInteraction = 0;
 
 // TRANSFORMING BUILDINGS
 const BUILDING_TRANSFORMS = {
@@ -895,13 +896,13 @@ function updateWatchAI() {
             if (b.type === 'store') {
                 const dx = b.x - player.x;
                 const dy = b.y - player.y;
-                if (Math.sqrt(dx*dx + dy*dy) < 80 && player.coins > 5) {
+                if (Math.sqrt(dx*dx + dy*dy) < 80) {
+                    // Check coins for each purchase separately
                     if (player.hunger < 50 && player.coins >= 3) {
                         player.hunger += 30;
                         player.coins -= 3;
                         showNarrative(NARRATIVES.pickupFood);
-                    }
-                    if (player.thirst < 50 && player.coins >= 2) {
+                    } else if (player.thirst < 50 && player.coins >= 2) {
                         player.thirst += 30;
                         player.coins -= 2;
                         showNarrative(NARRATIVES.pickupWater);
@@ -995,35 +996,37 @@ function grabNearby() {
         }
     });
 
-    // Check buildings
-    buildings.forEach(building => {
-        const dx = building.x - player.x;
-        const dy = building.y - player.y;
-        const dist = Math.sqrt(dx*dx + dy*dy);
+    // Check buildings (with cooldown to prevent spam)
+    if (frameCount - lastBuildingInteraction > 60) {
+        buildings.forEach(building => {
+            const dx = building.x - player.x;
+            const dy = building.y - player.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
 
-        if (dist < 60) {
-            enterBuilding(building);
-        }
-    });
+            if (dist < 60) {
+                enterBuilding(building);
+                lastBuildingInteraction = frameCount;
+            }
+        });
+    }
 }
 
 function enterBuilding(building) {
     if (building.type === 'store') {
-        if (player.coins >= 3) {
-            const choice = Math.random();
-            if (choice < 0.33 && player.hunger < 70) {
-                player.hunger = Math.min(player.maxHunger, player.hunger + 40);
-                player.coins -= 3;
-                showNarrative(['You buy some hearty provisions.']);
-            } else if (choice < 0.66 && player.thirst < 70) {
-                player.thirst = Math.min(player.maxThirst, player.thirst + 40);
-                player.coins -= 2;
-                showNarrative(['Fresh water, cool and clear.']);
-            } else if (player.ammo < 15) {
-                player.ammo += 15;
-                player.coins -= 5;
-                showNarrative(['You stock up on ammunition.']);
-            }
+        const choice = Math.random();
+        // Check coins for each purchase separately
+        if (choice < 0.33 && player.hunger < 70 && player.coins >= 3) {
+            player.hunger = Math.min(player.maxHunger, player.hunger + 40);
+            player.coins -= 3;
+            showNarrative(['You buy some hearty provisions.']);
+        } else if (choice < 0.66 && player.thirst < 70 && player.coins >= 2) {
+            player.thirst = Math.min(player.maxThirst, player.thirst + 40);
+            player.coins -= 2;
+            showNarrative(['Fresh water, cool and clear.']);
+        } else if (player.ammo < 15 && player.coins >= 5) {
+            player.ammo += 15;
+            player.coins -= 5;
+            showNarrative(['You stock up on ammunition.']);
         }
     } else if (building.type === 'saloon') {
         if (player.coins >= 2) {
