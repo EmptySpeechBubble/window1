@@ -13363,8 +13363,7 @@ for (let i = owls.length - 1; i >= 0; i--) {
     }
 
     // === NEW BEHAVIOR SYSTEM UPDATES ===
-    // Process synchronized chirping
-    const now = Date.now();
+    // Process synchronized chirping (reuse 'now' from line 13091)
     activeChirps = activeChirps.filter(chirp => now - chirp.timestamp < 2000); // Keep chirps for 2 seconds
 
     // Synchronized chirping - social chirps trigger nearby birds to chirp
