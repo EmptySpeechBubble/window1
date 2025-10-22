@@ -1230,7 +1230,7 @@ let rainbowsShown = 0; // Track number of rainbows that have appeared
         const FOOD_MEMORY_RETURN_CHANCE = 0.3; // 30% chance to return
 
         // Ground/air physics constants
-        const GROUND_Y_THRESHOLD = 10; // How close to ground to trigger ground phase
+        const GROUND_Y_THRESHOLD = 3; // How close to ground to trigger ground phase (reduced for lighter feel)
 
         // Chirping/calling constants
         const CHIRP_DURATION = 1500; // How long chirp visual lasts (ms)
@@ -4533,6 +4533,12 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                 this.chirpTimer = 0;
                 this.lastChirpTime = Date.now();
                 this.chirpNotes = []; // Visual chirp indicators
+
+                // Ground pecking animation
+                this.groundPecking = false;
+                this.peckCycle = 0; // Animation cycle for pecking
+                this.lastPeckTime = 0;
+                this.peckCount = 0; // Count pecks in sequence
             }
 
             applyForce(force) {
@@ -5275,8 +5281,12 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                 const groundY = canvas.height * GROUND_HEIGHT_RATIO;
                 const distToGround = groundY - this.y;
 
+                // Only lock to ground if bird is intentionally on ground (specific states)
+                const groundStates = [BIRD_STATES.HOPPING, BIRD_STATES.FEEDING];
+                const shouldBeOnGround = groundStates.includes(this.state);
+
                 // Check if bird should be in ground phase
-                if (distToGround <= GROUND_Y_THRESHOLD && Math.abs(this.velocity.y) < 0.5) {
+                if (distToGround <= GROUND_Y_THRESHOLD && Math.abs(this.velocity.y) < 0.3 && shouldBeOnGround) {
                     if (!this.groundPhase) {
                         // Entering ground phase
                         this.groundPhase = true;
@@ -5291,14 +5301,8 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                     this.y = groundY;
                     this.velocity.y = 0;
 
-                    // Can still move horizontally on ground (hopping/walking)
-                    if (this.state === BIRD_STATES.HOPPING || this.state === BIRD_STATES.FEEDING) {
-                        // Allow horizontal movement
-                        this.velocity.x *= 0.9; // Ground friction
-                    } else {
-                        // Minimal drift
-                        this.velocity.x *= 0.95;
-                    }
+                    // Allow horizontal movement with ground friction
+                    this.velocity.x *= 0.88; // Ground friction
                 } else {
                     // Air phase - apply gravity normally
                     if (this.groundPhase) {
@@ -5308,9 +5312,9 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                         debugLog(`${this.birdType.name} exited ground phase - entering air phase`);
                     }
 
-                    // Apply gravity only in air phase
+                    // Apply gravity only in air phase (lighter gravity for more natural flight)
                     if (!this.groundPhase) {
-                        this.applyForce({ x: 0, y: GRAVITY });
+                        this.applyForce({ x: 0, y: GRAVITY * 0.8 }); // Reduced gravity for lighter feel
                     }
                 }
             }
@@ -5613,6 +5617,47 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                 }
             }
 
+            // Ground Pecking Animation System
+            updateGroundPecking(deltaTime) {
+                const now = Date.now();
+
+                // Only peck when on ground and in appropriate states
+                if (this.groundPhase && (this.state === BIRD_STATES.HOPPING ||
+                    this.state === BIRD_STATES.FEEDING ||
+                    this.state === BIRD_STATES.HUNTING)) {
+
+                    // Trigger pecking animation periodically
+                    if (now - this.lastPeckTime > 800) { // Peck every 800ms
+                        this.groundPecking = true;
+                        this.peckCycle = 0;
+                        this.lastPeckTime = now;
+                        this.peckCount++;
+
+                        // After 3-5 pecks, pause longer
+                        if (this.peckCount > (3 + Math.floor(Math.random() * 3))) {
+                            this.lastPeckTime = now + 1500; // Longer pause
+                            this.peckCount = 0;
+                        }
+                    }
+
+                    // Update peck cycle
+                    if (this.groundPecking) {
+                        this.peckCycle += deltaTime * 0.01; // Increment animation cycle
+
+                        // End peck animation after one cycle
+                        if (this.peckCycle > Math.PI * 2) {
+                            this.groundPecking = false;
+                            this.peckCycle = 0;
+                        }
+                    }
+                } else {
+                    // Reset pecking when not on ground
+                    this.groundPecking = false;
+                    this.peckCycle = 0;
+                    this.peckCount = 0;
+                }
+            }
+
             // Chirping/Calling System
             triggerChirp(type = 'normal') {
                 const now = Date.now();
@@ -5759,6 +5804,7 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                 this.updateFoodMemory(); // Clean up old food memories
                 this.updateChirps(deltaTime); // Update chirp visuals
                 this.checkForChirpOpportunities(); // Check if bird should chirp
+                this.updateGroundPecking(deltaTime); // Update ground pecking animation
 
                 // Check for predators (prioritize over other behaviors)
                 if (this.checkForPredators()) {
@@ -7194,31 +7240,44 @@ if (this.pathIndex >= this.path.length) {
             // V26: Enhanced bird drawing with outlined wings
             draw() {
                 const sizeMultiplier = this.birdType.sizeMultiplier;
-                
-                // Determine if wings should be flapping based on state
-                const isFlapping = 
-                    this.state === BIRD_STATES.FLYING || 
-                    this.state === BIRD_STATES.FLEEING || 
-                    Math.abs(this.velocity.x) > 0.5 || 
-                    Math.abs(this.velocity.y) > 0.5;
-                
-                // // Calculate position adjustments for flapping/gliding/hopping motion
-    let yOffset;
-    
-    if (this.state === BIRD_STATES.HOPPING) {
-        // Hopping creates a bouncy motion - more pronounced up and down
-        yOffset = Math.abs(Math.sin(this.wingFlap * 1.5)) * 3;
-    } else {
-        // Regular flight bobbing
-        yOffset = Math.sin(this.wingFlap * 0.5) * (isFlapping ? 1.5 : 0.3); // Increased from 1.0/0.2
-    }
-                
-                // Wing position and spread - adjusted for more visibility
-                const wingSpread = isFlapping ? 
-                    Math.abs(Math.sin(this.wingFlap)) * this.birdType.wingFlapAmplitude * 1.2 : // Increased by 20%
-                    this.birdType.glideRatio * 1.2; // Increased by 20%
-                    
-                const wingY = isFlapping ? Math.cos(this.wingFlap) * 5 : 0; // Increased from 2 to 3
+
+                // Determine if wings should be flapping based on state (NOT when on ground!)
+                const isFlapping = !this.groundPhase && (
+                    this.state === BIRD_STATES.FLYING ||
+                    this.state === BIRD_STATES.FLEEING ||
+                    (Math.abs(this.velocity.x) > 0.5 || Math.abs(this.velocity.y) > 0.5)
+                );
+
+                // Calculate position adjustments for flapping/gliding/hopping/pecking motion
+                let yOffset;
+                let headOffset = 0; // Additional offset for head during pecking
+
+                if (this.state === BIRD_STATES.HOPPING) {
+                    // Hopping creates a bouncy motion - more pronounced up and down
+                    yOffset = Math.abs(Math.sin(this.wingFlap * 1.5)) * 3;
+                } else if (this.groundPhase) {
+                    // On ground, no bobbing but add pecking motion
+                    yOffset = 0;
+
+                    // Pecking animation - head bobs down quickly
+                    if (this.groundPecking) {
+                        // Quick down and up motion
+                        const peckProgress = Math.sin(this.peckCycle);
+                        headOffset = peckProgress * 6 * sizeMultiplier; // Head bobs down 6 pixels
+                    }
+                } else {
+                    // Regular flight bobbing
+                    yOffset = Math.sin(this.wingFlap * 0.5) * (isFlapping ? 1.5 : 0.3);
+                }
+
+                // Wing position and spread - folded when on ground
+                const wingSpread = this.groundPhase ? 0.15 : ( // Wings folded on ground
+                    isFlapping ?
+                        Math.abs(Math.sin(this.wingFlap)) * this.birdType.wingFlapAmplitude * 1.2 :
+                        this.birdType.glideRatio * 1.2
+                );
+
+                const wingY = isFlapping ? Math.cos(this.wingFlap) * 5 : 0;
                 
                 // Draw body
                  // MODIFY THIS LINE to use mushroom color:
@@ -7373,72 +7432,72 @@ if (this.pathIndex >= this.path.length) {
                     ctx.fill();
                 }
                 
-              // Draw the head
+              // Draw the head (with pecking offset)
 ctx.fillStyle = mushroomMode ? getMushroomColor(this.birdType.bodyColor) : this.birdType.bodyColor;
 ctx.beginPath();
 ctx.arc(
-    this.x + (this.direction * 8 * sizeMultiplier), 
-    this.y - 2 * sizeMultiplier + yOffset, 
-    6 * sizeMultiplier, 
+    this.x + (this.direction * 8 * sizeMultiplier),
+    this.y - 2 * sizeMultiplier + yOffset + headOffset,
+    6 * sizeMultiplier,
     0, Math.PI * 2
 );
 ctx.fill();
-                
-                // Draw beak (opens when chirping)
+
+                // Draw beak (opens when chirping, moves with pecking)
                 const beakOpen = this.chirping ? 3 * sizeMultiplier : 0;
-                ctx.fillStyle = this.pecking ? '#FF8800' : '#FFAA00';
+                ctx.fillStyle = this.pecking || this.groundPecking ? '#FF8800' : '#FFAA00';
 
                 if (this.direction > 0) {
                     // Upper beak
                     ctx.beginPath();
-                    ctx.moveTo(this.x + 12 * sizeMultiplier, this.y - 3 * sizeMultiplier + yOffset - beakOpen / 2);
-                    ctx.lineTo(this.x + 18 * sizeMultiplier, this.y - 2 * sizeMultiplier + yOffset - beakOpen / 2);
-                    ctx.lineTo(this.x + 12 * sizeMultiplier, this.y - 1 * sizeMultiplier + yOffset - beakOpen / 2);
+                    ctx.moveTo(this.x + 12 * sizeMultiplier, this.y - 3 * sizeMultiplier + yOffset + headOffset - beakOpen / 2);
+                    ctx.lineTo(this.x + 18 * sizeMultiplier, this.y - 2 * sizeMultiplier + yOffset + headOffset - beakOpen / 2);
+                    ctx.lineTo(this.x + 12 * sizeMultiplier, this.y - 1 * sizeMultiplier + yOffset + headOffset - beakOpen / 2);
                     ctx.fill();
 
                     // Lower beak (when chirping)
                     if (this.chirping) {
                         ctx.beginPath();
-                        ctx.moveTo(this.x + 12 * sizeMultiplier, this.y - 1 * sizeMultiplier + yOffset + beakOpen / 2);
-                        ctx.lineTo(this.x + 18 * sizeMultiplier, this.y - 2 * sizeMultiplier + yOffset + beakOpen / 2);
-                        ctx.lineTo(this.x + 12 * sizeMultiplier, this.y + 1 * sizeMultiplier + yOffset + beakOpen / 2);
+                        ctx.moveTo(this.x + 12 * sizeMultiplier, this.y - 1 * sizeMultiplier + yOffset + headOffset + beakOpen / 2);
+                        ctx.lineTo(this.x + 18 * sizeMultiplier, this.y - 2 * sizeMultiplier + yOffset + headOffset + beakOpen / 2);
+                        ctx.lineTo(this.x + 12 * sizeMultiplier, this.y + 1 * sizeMultiplier + yOffset + headOffset + beakOpen / 2);
                         ctx.fill();
                     }
                 } else {
                     // Upper beak
                     ctx.beginPath();
-                    ctx.moveTo(this.x - 12 * sizeMultiplier, this.y - 3 * sizeMultiplier + yOffset - beakOpen / 2);
-                    ctx.lineTo(this.x - 18 * sizeMultiplier, this.y - 2 * sizeMultiplier + yOffset - beakOpen / 2);
-                    ctx.lineTo(this.x - 12 * sizeMultiplier, this.y - 1 * sizeMultiplier + yOffset - beakOpen / 2);
+                    ctx.moveTo(this.x - 12 * sizeMultiplier, this.y - 3 * sizeMultiplier + yOffset + headOffset - beakOpen / 2);
+                    ctx.lineTo(this.x - 18 * sizeMultiplier, this.y - 2 * sizeMultiplier + yOffset + headOffset - beakOpen / 2);
+                    ctx.lineTo(this.x - 12 * sizeMultiplier, this.y - 1 * sizeMultiplier + yOffset + headOffset - beakOpen / 2);
                     ctx.fill();
 
                     // Lower beak (when chirping)
                     if (this.chirping) {
                         ctx.beginPath();
-                        ctx.moveTo(this.x - 12 * sizeMultiplier, this.y - 1 * sizeMultiplier + yOffset + beakOpen / 2);
-                        ctx.lineTo(this.x - 18 * sizeMultiplier, this.y - 2 * sizeMultiplier + yOffset + beakOpen / 2);
-                        ctx.lineTo(this.x - 12 * sizeMultiplier, this.y + 1 * sizeMultiplier + yOffset + beakOpen / 2);
+                        ctx.moveTo(this.x - 12 * sizeMultiplier, this.y - 1 * sizeMultiplier + yOffset + headOffset + beakOpen / 2);
+                        ctx.lineTo(this.x - 18 * sizeMultiplier, this.y - 2 * sizeMultiplier + yOffset + headOffset + beakOpen / 2);
+                        ctx.lineTo(this.x - 12 * sizeMultiplier, this.y + 1 * sizeMultiplier + yOffset + headOffset + beakOpen / 2);
                         ctx.fill();
                     }
                 }
                 
-                // Eyes with pupil and highlight for cuter appearance
+                // Eyes with pupil and highlight for cuter appearance (move with pecking)
                 ctx.fillStyle = 'black';
                 ctx.beginPath();
                 ctx.arc(
-                    this.x + (this.direction * 8 * sizeMultiplier), 
-                    this.y - 3 * sizeMultiplier + yOffset, 
+                    this.x + (this.direction * 8 * sizeMultiplier),
+                    this.y - 3 * sizeMultiplier + yOffset + headOffset,
                     2 * sizeMultiplier,
                     0, Math.PI * 2
                 );
                 ctx.fill();
-                
+
                 // Add white highlight to eyes for cute effect
                 ctx.fillStyle = 'white';
                 ctx.beginPath();
                 ctx.arc(
-                    this.x + (this.direction * 8.5 * sizeMultiplier), 
-                    this.y - 3.5 * sizeMultiplier + yOffset, 
+                    this.x + (this.direction * 8.5 * sizeMultiplier),
+                    this.y - 3.5 * sizeMultiplier + yOffset + headOffset,
                     0.8 * sizeMultiplier,
                     0, Math.PI * 2
                 );
