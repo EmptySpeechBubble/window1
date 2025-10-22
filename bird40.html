@@ -1039,6 +1039,51 @@ let tallTreeCount = 0;
 let simulationTime = 0; // Track total simulation time for better spawning control
 let lastStatsUpdate = 0; // Track when we last updated the stats display
 let cloudCover = 0; // For weather transition effects
+
+// === NEW BIRD BEHAVIOR SYSTEMS ===
+// Danger zone memory - shared across all birds
+let dangerZones = []; // {x, y, timestamp, threatType}
+const DANGER_MEMORY_DURATION = 180000; // Remember danger for 3 minutes
+const DANGER_ZONE_RADIUS = 150; // How far to avoid danger zones
+
+// Shared flock knowledge for food locations
+let sharedFoodKnowledge = []; // {x, y, timestamp, discoveredBy}
+const FOOD_KNOWLEDGE_DURATION = 120000; // Share food knowledge for 2 minutes
+
+// Chirp types for different communication
+const CHIRP_TYPES = {
+    SOCIAL: 'social',
+    FOOD_CALL: 'food_call',
+    CONTACT_CALL: 'contact_call',
+    ALERT: 'alert',
+    TERRITORIAL: 'territorial',
+    VICTORY: 'victory'
+};
+
+// Active chirps in the world
+let activeChirps = []; // {x, y, type, timestamp, birdId}
+
+// Sentinel rotation tracking
+let currentSentinels = new Map(); // Maps flock groups to sentinel bird
+let sentinelRotationTimers = new Map(); // Track when to rotate sentinel
+
+// Mobbing coordination
+let activeMobbings = []; // {targetX, targetY, participants: [], startTime}
+
+// Territorial disputes tracking
+let territorialDisputes = []; // {bird1, bird2, location, startTime}
+
+// Constants for new behaviors
+const SENTINEL_ROTATION_INTERVAL = 25000; // 25 seconds
+const MOBBING_DURATION = 12000; // 12 seconds
+const MOBBING_DIVE_FREQUENCY = 2000; // Dive every 2 seconds
+const GROUND_ESCAPE_DELAY = 250; // 250ms delay for ground birds
+const PECKING_INTERVAL_SOLO = 800; // Solo bird pecking speed
+const PECKING_INTERVAL_GROUP = 500; // Group feeding pecking speed
+const FLOCK_DISTANCE = 200; // Birds within this distance are considered flockmates
+const CONTACT_CALL_DISTANCE = 150; // Call when flockmates are this far
+const TERRITORIAL_DISPLAY_DURATION = 3000; // 3 seconds
+const FEAR_OVERRIDE_HUNGER = 600; // Hunger level that overrides fear
 let currentHour = 9; // Track the hour of day (0-23)
 let lastHourlyUpdate = 0; // Track when we last updated the hourly activities
 let timeOfDay = 0.75; // Track day/night cycle (0-1 = day, 1-2 = night)
@@ -1203,10 +1248,15 @@ let rainbowsShown = 0; // Track number of rainbows that have appeared
             FLEEING: 'fleeing',
             SHELTERING: 'sheltering',
             RESTING: 'resting',
-            BATHING: 'bathing',  
+            BATHING: 'bathing',
             FLYING: 'flying',
             BUILDING_BIRDHOUSE: 'building_birdhouse',
-            HOPPING: 'hopping' // Add this new state
+            HOPPING: 'hopping',
+            SENTINEL: 'sentinel', // Standing guard while others feed
+            MOBBING: 'mobbing', // Harassing predators
+            PECKING: 'pecking', // Ground pecking for food
+            TERRITORIAL_DISPLAY: 'territorial_display', // Showing dominance
+            FLEEING_GROUND: 'fleeing_ground' // Escaping from ground (slower)
         };
         
         const BIRDHOUSE_MATERIALS_NEEDED = 5;
@@ -4462,6 +4512,46 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                 // Add directionChangeCooldown property
                 this.directionChangeCooldown = 0;
 
+                // === NEW BEHAVIOR PROPERTIES ===
+                // Unique ID for tracking
+                this.id = Math.random().toString(36).substr(2, 9);
+
+                // Flocking and social behavior
+                this.flockId = null; // Assigned when bird joins a flock
+                this.isSentinel = false;
+                this.lastSentinelTime = 0;
+
+                // Territorial and aggression
+                this.aggression = 0.3 + Math.random() * 0.7; // 0.3-1.0 aggression level
+                this.territorialRange = 80 + this.aggression * 70; // 80-150px territory
+                this.lastTerritorialDisplay = 0;
+                this.defeatedRecently = false;
+                this.defeatTimer = 0;
+
+                // Food memory (individual)
+                this.foodMemory = []; // {x, y, timestamp}
+                this.lastFoodCall = 0;
+
+                // Chirping behavior
+                this.lastChirp = 0;
+                this.chirpCooldown = 0;
+                this.lastContactCall = 0;
+
+                // Ground pecking
+                this.isOnGround = false;
+                this.peckingInterval = PECKING_INTERVAL_SOLO;
+                this.lastPeckTime = 0;
+                this.peckAnimationPhase = 0;
+
+                // Mobbing behavior
+                this.isMobbing = false;
+                this.mobbingTarget = null;
+                this.lastMobbingDive = 0;
+
+                // Danger awareness
+                this.lastDangerEncounter = 0;
+                this.fearLevel = 0; // Increases with danger, decreases over time
+
                 // In the Bird class update method
                 if (this.y > canvas.height * GROUND_HEIGHT_RATIO) {
                     this.y = canvas.height * GROUND_HEIGHT_RATIO;
@@ -4718,14 +4808,35 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
             findFoodSource() {
                 // Try to find food or worms
                 let foundFood = false;
-                
+
                 // Expanded vision radius when hungry
-                const visionRadius = this.hunger > HUNGER_CRITICAL_THRESHOLD ? 
+                const visionRadius = this.hunger > HUNGER_CRITICAL_THRESHOLD ?
                     BIRD_FOOD_VISION_RADIUS * 2 : BIRD_FOOD_VISION_RADIUS * 1.5;
-                
+
+                // Check food memory first
+                const now = Date.now();
+                this.foodMemory = this.foodMemory.filter(f => now - f.timestamp < FOOD_KNOWLEDGE_DURATION);
+
+                if (this.foodMemory.length > 0 && Math.random() < 0.4) {
+                    const memFood = this.foodMemory[0];
+                    // Check if danger zone
+                    if (!this.isDangerZone(memFood.x, memFood.y)) {
+                        this.target = {
+                            type: 'remembered',
+                            x: memFood.x,
+                            y: memFood.y
+                        };
+                        this.state = BIRD_STATES.HUNTING;
+                        this.stateTimer = 0;
+                        debugLog(`Bird using food memory`);
+                        return;
+                    }
+                }
+
                 // Target worms first (more nutritious)
                 for (const worm of worms) {
-                    if (distance(this.x, this.y, worm.x, worm.y) < visionRadius) {
+                    if (distance(this.x, this.y, worm.x, worm.y) < visionRadius &&
+                        !this.isDangerZone(worm.x, worm.y)) {
                         this.target = {
                             type: 'worm',
                             worm: worm,
@@ -4735,15 +4846,25 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                         this.state = BIRD_STATES.HUNTING;
                         this.stateTimer = 0;
                         foundFood = true;
+
+                        // Add to memory
+                        this.foodMemory.push({x: worm.x, y: worm.y, timestamp: now});
+
+                        // Make food call
+                        if (Math.random() < 0.3) {
+                            this.makeFoodCall(worm.x, worm.y);
+                        }
+
                         debugLog(`Bird found worm at (${worm.x}, ${worm.y})`);
                         break;
                     }
                 }
-                
+
                 // If no worms found, try to find food items
                 if (!foundFood) {
                     for (const food of foodItems) {
-                        if (distance(this.x, this.y, food.x, food.y) < visionRadius) {
+                        if (distance(this.x, this.y, food.x, food.y) < visionRadius &&
+                            !this.isDangerZone(food.x, food.y)) {
                             this.target = {
                                 type: 'food',
                                 food: food,
@@ -4753,6 +4874,15 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                             this.state = BIRD_STATES.HUNTING;
                             this.stateTimer = 0;
                             foundFood = true;
+
+                            // Add to memory
+                            this.foodMemory.push({x: food.x, y: food.y, timestamp: now});
+
+                            // Make food call
+                            if (Math.random() < 0.3) {
+                                this.makeFoodCall(food.x, food.y);
+                            }
+
                             debugLog(`Bird found food at (${food.x}, ${food.y})`);
                             break;
                         }
@@ -5184,19 +5314,334 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                 const dx = this.x - threatX;
                 const dy = this.y - threatY;
                 const dir = normalize(dx, dy);
-                
-                // Set fleeing state
-                this.state = BIRD_STATES.FLEEING;
-                this.stateTimer = 0;
-                
-                // Apply immediate force away from threat
-                this.velocity.x = dir.x * this.baseSpeed * 2;
-                this.velocity.y = dir.y * this.baseSpeed * 1.5 - 1; // Upward bias
-                
+
+                // Record danger
+                this.recordDanger(threatX, threatY, 'unknown');
+
+                // Ground birds flee slower - use FLEEING_GROUND state
+                if (this.isOnGround || this.y > canvas.height * GROUND_HEIGHT_RATIO - 20) {
+                    this.state = BIRD_STATES.FLEEING_GROUND;
+                    this.stateTimer = 0;
+                    this.velocity = { x: 0, y: 0 }; // Will launch after delay
+                } else {
+                    // Air birds flee immediately
+                    this.state = BIRD_STATES.FLEEING;
+                    this.stateTimer = 0;
+
+                    // Apply immediate force away from threat
+                    this.velocity.x = dir.x * this.baseSpeed * 2;
+                    this.velocity.y = dir.y * this.baseSpeed * 1.5 - 1; // Upward bias
+                }
+
                 // Set direction faced
                 this.direction = dx > 0 ? 1 : -1;
-                
+
+                // Alert chirp
+                this.chirp(CHIRP_TYPES.ALERT, 1.0);
+
                 debugLog(`Bird fleeing from threat at (${threatX}, ${threatY})`);
+            }
+
+            // === NEW BEHAVIOR METHODS ===
+
+            // Get all nearby flockmates
+            getFlockmates() {
+                return birds.filter(b =>
+                    b !== this &&
+                    !b.isWild &&
+                    distance(this.x, this.y, b.x, b.y) < FLOCK_DISTANCE &&
+                    b.birdType.name === this.birdType.name // Same species flock together
+                );
+            }
+
+            // Check if this bird should be sentinel
+            updateSentinelRole(flockmates) {
+                if (flockmates.length === 0) {
+                    this.isSentinel = false;
+                    return;
+                }
+
+                const now = Date.now();
+                const flockKey = `flock_${this.birdType.name}`;
+
+                // Check if it's time to rotate sentinel
+                if (!sentinelRotationTimers.has(flockKey) ||
+                    now - sentinelRotationTimers.get(flockKey) > SENTINEL_ROTATION_INTERVAL) {
+
+                    // Choose new sentinel (random from flock)
+                    const candidates = [this, ...flockmates];
+                    const newSentinel = candidates[Math.floor(Math.random() * candidates.length)];
+
+                    // Clear old sentinel status
+                    candidates.forEach(b => b.isSentinel = false);
+
+                    // Assign new sentinel
+                    newSentinel.isSentinel = true;
+                    currentSentinels.set(flockKey, newSentinel);
+                    sentinelRotationTimers.set(flockKey, now);
+
+                    debugLog(`New sentinel assigned in ${this.birdType.name} flock`);
+                }
+            }
+
+            // Emit a chirp with specific type
+            chirp(type, intensity = 1.0) {
+                const now = Date.now();
+                if (now - this.lastChirp < 1000) return; // Cooldown
+
+                this.lastChirp = now;
+                activeChirps.push({
+                    x: this.x,
+                    y: this.y,
+                    type: type,
+                    timestamp: now,
+                    birdId: this.id,
+                    intensity: intensity
+                });
+
+                // Play audio if wind chimes enabled
+                if (windChimeEnabled && audioContext) {
+                    const notes = {
+                        [CHIRP_TYPES.SOCIAL]: ['C4'],
+                        [CHIRP_TYPES.FOOD_CALL]: ['G4', 'C5'],
+                        [CHIRP_TYPES.CONTACT_CALL]: ['E4'],
+                        [CHIRP_TYPES.ALERT]: ['C3', 'C3'],
+                        [CHIRP_TYPES.TERRITORIAL]: ['F3'],
+                        [CHIRP_TYPES.VICTORY]: ['C5', 'E5', 'G5']
+                    };
+
+                    const chirpNotes = notes[type] || ['C4'];
+                    chirpNotes.forEach((note, i) => {
+                        setTimeout(() => playNote(note, 0.5 * intensity), i * 100);
+                    });
+                }
+            }
+
+            // Announce food discovery to flockmates
+            makeFoodCall(foodX, foodY) {
+                const now = Date.now();
+                if (now - this.lastFoodCall < 3000) return; // Don't spam food calls
+
+                this.lastFoodCall = now;
+                this.chirp(CHIRP_TYPES.FOOD_CALL, 1.2);
+
+                // Add to shared flock knowledge
+                sharedFoodKnowledge.push({
+                    x: foodX,
+                    y: foodY,
+                    timestamp: now,
+                    discoveredBy: this.id
+                });
+
+                // Flockmates add to their own memory too
+                const flockmates = this.getFlockmates();
+                flockmates.forEach(bird => {
+                    if (distance(bird.x, bird.y, this.x, this.y) < 200) {
+                        bird.foodMemory.push({
+                            x: foodX,
+                            y: foodY,
+                            timestamp: now
+                        });
+                    }
+                });
+
+                debugLog(`${this.birdType.name} made food call at (${foodX}, ${foodY})`);
+            }
+
+            // Make contact call when far from flock
+            checkContactCall() {
+                const flockmates = this.getFlockmates();
+                if (flockmates.length === 0) return;
+
+                const nearestDist = Math.min(...flockmates.map(b =>
+                    distance(this.x, this.y, b.x, b.y)
+                ));
+
+                const now = Date.now();
+                if (nearestDist > CONTACT_CALL_DISTANCE && now - this.lastContactCall > 5000) {
+                    this.lastContactCall = now;
+                    this.chirp(CHIRP_TYPES.CONTACT_CALL, 0.7);
+                }
+            }
+
+            // Start mobbing behavior against predator
+            startMobbing(predatorX, predatorY, predatorType) {
+                this.isMobbing = true;
+                this.mobbingTarget = {x: predatorX, y: predatorY, type: predatorType};
+                this.state = BIRD_STATES.MOBBING;
+                this.stateTimer = 0;
+                this.chirp(CHIRP_TYPES.ALERT, 1.5);
+
+                // Alert flockmates to join mobbing
+                const flockmates = this.getFlockmates();
+                flockmates.forEach(bird => {
+                    if (distance(bird.x, bird.y, this.x, this.y) < 300 && bird.aggression > 0.4) {
+                        bird.isMobbing = true;
+                        bird.mobbingTarget = {x: predatorX, y: predatorY, type: predatorType};
+                        bird.state = BIRD_STATES.MOBBING;
+                        bird.stateTimer = 0;
+                    }
+                });
+
+                // Register active mobbing
+                activeMobbings.push({
+                    targetX: predatorX,
+                    targetY: predatorY,
+                    participants: [this.id, ...flockmates.filter(b => b.isMobbing).map(b => b.id)],
+                    startTime: Date.now()
+                });
+
+                debugLog(`Mobbing started against ${predatorType} at (${predatorX}, ${predatorY})`);
+            }
+
+            // Update mobbing behavior
+            updateMobbing(deltaTime) {
+                const now = Date.now();
+                if (!this.mobbingTarget || this.stateTimer > MOBBING_DURATION) {
+                    // End mobbing
+                    this.isMobbing = false;
+                    this.mobbingTarget = null;
+                    this.state = BIRD_STATES.FLYING;
+                    return;
+                }
+
+                // Circle and dive at target
+                if (now - this.lastMobbingDive > MOBBING_DIVE_FREQUENCY) {
+                    this.lastMobbingDive = now;
+
+                    // Calculate dive point near predator
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = 50 + Math.random() * 50;
+                    const targetX = this.mobbingTarget.x + Math.cos(angle) * radius;
+                    const targetY = this.mobbingTarget.y + Math.sin(angle) * radius - 30;
+
+                    this.generatePath(targetX, targetY);
+
+                    // Aggressive chirping
+                    if (Math.random() < 0.3) {
+                        this.chirp(CHIRP_TYPES.ALERT, 0.8);
+                    }
+                }
+            }
+
+            // Add danger zone to memory
+            recordDanger(dangerX, dangerY, threatType) {
+                this.lastDangerEncounter = Date.now();
+                this.fearLevel = Math.min(1.0, this.fearLevel + 0.3);
+
+                // Add to global danger zones
+                dangerZones.push({
+                    x: dangerX,
+                    y: dangerY,
+                    timestamp: Date.now(),
+                    threatType: threatType
+                });
+
+                debugLog(`Danger recorded at (${dangerX}, ${dangerY}): ${threatType}`);
+            }
+
+            // Check if location is in a danger zone
+            isDangerZone(x, y) {
+                const now = Date.now();
+
+                // Override fear if starving
+                if (this.hunger > FEAR_OVERRIDE_HUNGER) {
+                    return false;
+                }
+
+                // Clean up old danger zones
+                dangerZones = dangerZones.filter(d => now - d.timestamp < DANGER_MEMORY_DURATION);
+
+                // Check if point is in any danger zone
+                return dangerZones.some(d =>
+                    distance(x, y, d.x, d.y) < DANGER_ZONE_RADIUS
+                );
+            }
+
+            // Ground pecking behavior
+            startPecking() {
+                this.state = BIRD_STATES.PECKING;
+                this.isOnGround = true;
+                this.peckTimer = 0;
+                this.lastPeckTime = Date.now();
+
+                // Check for nearby flockmates to determine pecking speed
+                const nearbyFeeding = birds.filter(b =>
+                    b !== this &&
+                    b.state === BIRD_STATES.PECKING &&
+                    distance(this.x, this.y, b.x, b.y) < 100
+                );
+
+                // Social facilitation - peck faster in groups
+                if (nearbyFeeding.length > 0) {
+                    this.peckingInterval = PECKING_INTERVAL_GROUP;
+                } else {
+                    this.peckingInterval = PECKING_INTERVAL_SOLO;
+                }
+            }
+
+            // Update pecking animation
+            updatePecking(deltaTime) {
+                const now = Date.now();
+
+                // Check if should peck
+                if (now - this.lastPeckTime > this.peckingInterval) {
+                    this.lastPeckTime = now;
+                    this.peckAnimationPhase = 1.0; // Start peck animation
+
+                    // Actually consume food if present
+                    const nearbyFood = foodItems.find(f =>
+                        distance(this.x, this.y, f.x, f.y) < 20
+                    );
+
+                    if (nearbyFood) {
+                        this.hunger = Math.max(0, this.hunger - 50);
+                        foodItems.splice(foodItems.indexOf(nearbyFood), 1);
+                    }
+                }
+
+                // Animate peck
+                if (this.peckAnimationPhase > 0) {
+                    this.peckAnimationPhase -= deltaTime / 200; // Animation duration
+                    this.peckAnimationPhase = Math.max(0, this.peckAnimationPhase);
+                }
+
+                // Check for nearby pecking birds for social facilitation
+                const nearbyFeeding = birds.filter(b =>
+                    b !== this &&
+                    b.state === BIRD_STATES.PECKING &&
+                    distance(this.x, this.y, b.x, b.y) < 100
+                );
+
+                this.peckingInterval = nearbyFeeding.length > 0 ?
+                    PECKING_INTERVAL_GROUP : PECKING_INTERVAL_SOLO;
+            }
+
+            // Territorial display behavior
+            startTerritorialDisplay(rival) {
+                this.state = BIRD_STATES.TERRITORIAL_DISPLAY;
+                this.lastTerritorialDisplay = Date.now();
+                this.stateTimer = 0;
+                this.chirp(CHIRP_TYPES.TERRITORIAL, 1.0);
+
+                // Alert flockmates for coalition support
+                const flockmates = this.getFlockmates();
+                const supporters = flockmates.filter(b =>
+                    distance(b.x, b.y, this.x, this.y) < 150 &&
+                    b.aggression > 0.5
+                );
+
+                // Record territorial dispute
+                territorialDisputes.push({
+                    bird1: this,
+                    bird2: rival,
+                    location: {x: this.x, y: this.y},
+                    startTime: Date.now(),
+                    supporters1: supporters.length,
+                    supporters2: 0 // Would count rival's supporters
+                });
+
+                debugLog(`Territorial display: ${this.birdType.name} vs ${rival.birdType.name}`);
             }
 
             update(deltaTime) {
@@ -5307,6 +5752,66 @@ if (this.state === BIRD_STATES.FLYING) {
     }
 }
 
+                // === NEW BEHAVIOR UPDATES ===
+                // Update flocking behaviors
+                const flockmates = this.getFlockmates();
+
+                // Update sentinel role
+                if (!this.isWild && flockmates.length > 0) {
+                    this.updateSentinelRole(flockmates);
+                }
+
+                // Contact calls - check if far from flock
+                if (flockmates.length > 0 && Math.random() < 0.01) {
+                    this.checkContactCall();
+                }
+
+                // Decrease fear level over time
+                if (this.fearLevel > 0) {
+                    this.fearLevel = Math.max(0, this.fearLevel - 0.001 * deltaTime / 16);
+                }
+
+                // Update defeat timer
+                if (this.defeatedRecently) {
+                    this.defeatTimer += deltaTime;
+                    if (this.defeatTimer > 10000) {
+                        this.defeatedRecently = false;
+                        this.defeatTimer = 0;
+                    }
+                }
+
+                // Clean up old food memory
+                const now = Date.now();
+                this.foodMemory = this.foodMemory.filter(f => now - f.timestamp < FOOD_KNOWLEDGE_DURATION);
+
+                // Check for owl/crow (predators) to mob
+                if (!this.isWild && !this.isMobbing && flockmates.length >= 2) {
+                    // Check for nearby owls
+                    for (const owl of owls) {
+                        if (distance(this.x, this.y, owl.x, owl.y) < 250) {
+                            // High aggression birds more likely to initiate mobbing
+                            if (Math.random() < this.aggression * 0.1) {
+                                this.startMobbing(owl.x, owl.y, 'owl');
+                                this.recordDanger(owl.x, owl.y, 'owl');
+                                break;
+                            }
+                        }
+                    }
+                    // Check for nearby crows
+                    for (const crow of crows) {
+                        if (distance(this.x, this.y, crow.x, crow.y) < 200) {
+                            if (Math.random() < this.aggression * 0.05) {
+                                this.startMobbing(crow.x, crow.y, 'crow');
+                                this.recordDanger(crow.x, crow.y, 'crow');
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Update ground status
+                const groundY = canvas.height * GROUND_HEIGHT_RATIO;
+                this.isOnGround = Math.abs(this.y - groundY) < 10 && Math.abs(this.velocity.y) < 0.5;
 
                 // Update bird based on its current state
                 switch (this.state) {
@@ -5566,7 +6071,35 @@ if ((isRaining || timeOfDay >= 1) && Math.random() < 0.4) { // 40% chance to see
                         const huntTargetDist = distance(this.x, this.y, this.target.x, this.target.y);
                         
                         if (huntTargetDist < 25) { // Increased from 10 - easier to collect food
-                            // Reached target - eat it
+                            // Check dominance hierarchy - lower aggression birds wait for dominant birds
+                            const flockmates = this.getFlockmates();
+                            const dominantBirdsNearby = flockmates.filter(b =>
+                                b.aggression > this.aggression &&
+                                distance(this.x, this.y, b.x, b.y) < 50 &&
+                                b.state === BIRD_STATES.HUNTING
+                            );
+
+                            // If dominant birds nearby and this bird is submissive, wait
+                            if (dominantBirdsNearby.length > 0 && this.aggression < 0.6) {
+                                // Wait 1-2 seconds before feeding
+                                if (this.stateTimer < 1500) {
+                                    this.velocity.x *= 0.9;
+                                    this.velocity.y *= 0.9;
+                                    break;
+                                }
+                            }
+
+                            // Reached target - check if ground food
+                            const isGroundFood = (this.target.type === 'worm' || this.target.type === 'food') &&
+                                this.target.y > canvas.height * GROUND_HEIGHT_RATIO - 50;
+
+                            if (isGroundFood && huntTargetDist < 30) {
+                                // Transition to pecking behavior instead of instant eating
+                                this.startPecking();
+                                break;
+                            }
+
+                            // Eat it (for non-ground food or baby feeding)
                             if (this.target.type === 'worm') {
                                 const wormIndex = worms.indexOf(this.target.worm);
                                 if (wormIndex !== -1) {
@@ -6622,9 +7155,137 @@ if (this.pathIndex >= this.path.length) {
     }
     break;
 
+                    case BIRD_STATES.MOBBING:
+                        // Update mobbing behavior
+                        this.updateMobbing(deltaTime);
 
+                        // Follow path if one exists
+                        if (this.path && this.path.length > 0 && this.pathIndex < this.path.length) {
+                            const currentTarget = this.path[this.pathIndex];
+                            const dist = distance(this.x, this.y, currentTarget.x, currentTarget.y);
 
+                            if (dist < 20) {
+                                this.pathIndex++;
+                            } else {
+                                const dx = currentTarget.x - this.x;
+                                const dy = currentTarget.y - this.y;
+                                const dir = normalize(dx, dy);
+                                this.applyForce({ x: dir.x * 0.04, y: dir.y * 0.04 });
+                            }
+                        }
+                        break;
 
+                    case BIRD_STATES.PECKING:
+                        // Update pecking behavior
+                        this.updatePecking(deltaTime);
+
+                        // Sentinel doesn't peck
+                        if (this.isSentinel) {
+                            this.pecking = false;
+                            // Scan for threats
+                            if (Math.random() < 0.02) {
+                                this.chirp(CHIRP_TYPES.SOCIAL, 0.5);
+                            }
+                        } else {
+                            // Actually peck
+                            this.pecking = this.peckAnimationPhase > 0;
+                        }
+
+                        // Stay on ground
+                        this.y = canvas.height * GROUND_HEIGHT_RATIO;
+                        this.velocity.y = 0;
+
+                        // Check if should make food call
+                        const nearbyFood = foodItems.find(f =>
+                            distance(this.x, this.y, f.x, f.y) < 30
+                        );
+                        if (nearbyFood && Math.random() < 0.02) {
+                            this.makeFoodCall(nearbyFood.x, nearbyFood.y);
+                        }
+
+                        // Chance to stop pecking
+                        if (this.stateTimer > 5000 || this.hunger < 100) {
+                            this.state = BIRD_STATES.FLYING;
+                            this.isOnGround = false;
+                        }
+                        break;
+
+                    case BIRD_STATES.SENTINEL:
+                        // Sentinel stays alert, doesn't feed
+                        this.pecking = false;
+                        this.isOnGround = true;
+                        this.y = canvas.height * GROUND_HEIGHT_RATIO;
+                        this.velocity = { x: 0, y: 0 };
+
+                        // Scan for threats
+                        if (Math.random() < 0.05) {
+                            // Check for predators
+                            for (const owl of owls) {
+                                if (distance(this.x, this.y, owl.x, owl.y) < 300) {
+                                    // Alert call
+                                    this.chirp(CHIRP_TYPES.ALERT, 1.5);
+                                    this.recordDanger(owl.x, owl.y, 'owl');
+                                    // Alert flockmates
+                                    const flockmates = this.getFlockmates();
+                                    flockmates.forEach(b => {
+                                        if (b.state === BIRD_STATES.PECKING) {
+                                            b.flee(owl.x, owl.y);
+                                        }
+                                    });
+                                    break;
+                                }
+                            }
+                        }
+                        break;
+
+                    case BIRD_STATES.TERRITORIAL_DISPLAY:
+                        // Territorial display behavior
+                        if (this.isOnGround) {
+                            // Ground display - hopping toward rival
+                            if (Math.random() < 0.3) {
+                                this.pecking = true;
+                            }
+                        }
+
+                        // Occasional territorial chirps
+                        if (Math.random() < 0.05) {
+                            this.chirp(CHIRP_TYPES.TERRITORIAL, 0.8);
+                        }
+
+                        // End display after duration
+                        if (this.stateTimer > TERRITORIAL_DISPLAY_DURATION) {
+                            // Determine winner based on aggression and flock support
+                            const flockSupport = this.getFlockmates().filter(b =>
+                                distance(b.x, b.y, this.x, this.y) < 150
+                            ).length;
+
+                            if (flockSupport > 0 || this.aggression > 0.7) {
+                                // Victory!
+                                this.chirp(CHIRP_TYPES.VICTORY, 1.2);
+                                debugLog(`${this.birdType.name} won territorial dispute!`);
+                            } else {
+                                // Defeat
+                                this.defeatedRecently = true;
+                                this.defeatTimer = 0;
+                                debugLog(`${this.birdType.name} lost territorial dispute`);
+                            }
+
+                            this.state = BIRD_STATES.FLYING;
+                        }
+                        break;
+
+                    case BIRD_STATES.FLEEING_GROUND:
+                        // Ground birds flee slower - hop launch delay
+                        if (this.stateTimer < GROUND_ESCAPE_DELAY) {
+                            // Delay before takeoff
+                            this.y = canvas.height * GROUND_HEIGHT_RATIO;
+                            this.velocity.y = 0;
+                        } else {
+                            // Now take off
+                            this.state = BIRD_STATES.FLEEING;
+                            this.velocity.y = -this.baseSpeed * 2;
+                        }
+                        break;
 
 }
 
@@ -12700,6 +13361,46 @@ for (let i = owls.length - 1; i >= 0; i--) {
     if (simulationTime % TREE_REGROWTH_RATE < 16) {
         regrowTrees();
     }
+
+    // === NEW BEHAVIOR SYSTEM UPDATES ===
+    // Process synchronized chirping
+    const now = Date.now();
+    activeChirps = activeChirps.filter(chirp => now - chirp.timestamp < 2000); // Keep chirps for 2 seconds
+
+    // Synchronized chirping - social chirps trigger nearby birds to chirp
+    if (activeChirps.length > 0 && Math.random() < 0.05) {
+        const recentChirps = activeChirps.filter(c =>
+            c.type === CHIRP_TYPES.SOCIAL && now - c.timestamp < 500
+        );
+
+        recentChirps.forEach(chirp => {
+            // Find nearby birds to potentially trigger
+            const nearbyBirds = birds.filter(b =>
+                distance(b.x, b.y, chirp.x, chirp.y) < 150 &&
+                b.id !== chirp.birdId &&
+                !b.defeatedRecently
+            );
+
+            nearbyBirds.forEach(bird => {
+                // 10% chance to chirp in response (cascade effect)
+                if (Math.random() < 0.1 && now - bird.lastChirp > 2000) {
+                    bird.chirp(CHIRP_TYPES.SOCIAL, 0.6);
+                }
+            });
+        });
+    }
+
+    // Clean up old danger zones
+    dangerZones = dangerZones.filter(d => now - d.timestamp < DANGER_MEMORY_DURATION);
+
+    // Clean up old shared food knowledge
+    sharedFoodKnowledge = sharedFoodKnowledge.filter(f => now - f.timestamp < FOOD_KNOWLEDGE_DURATION);
+
+    // Clean up completed mobbings
+    activeMobbings = activeMobbings.filter(m => now - m.startTime < MOBBING_DURATION);
+
+    // Clean up old territorial disputes
+    territorialDisputes = territorialDisputes.filter(d => now - d.startTime < 10000);
 
     if (simulationTime % GUARANTEED_TREE_CHECK_RATE < 16) {
         checkEcosystemHealth();
