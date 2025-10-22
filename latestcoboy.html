@@ -1,0 +1,1881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wild West Rogue</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1410;
+            color: #d4a574;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        #gameCanvas {
+            border: 3px solid #5a4a2a;
+            background: #2a2010;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        .ui-panel {
+            position: fixed;
+            background: rgba(28, 24, 16, 0.9);
+            border: 2px solid #5a4a2a;
+            color: #d4a574;
+            font-size: 11px;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+            white-space: pre;
+            z-index: 100;
+        }
+
+        #stats {
+            top: 10px;
+            right: 10px;
+            min-width: 180px;
+            line-height: 1.4;
+        }
+
+        #chibi {
+            bottom: 20px;
+            left: 20px;
+            width: 140px;
+            padding: 10px;
+        }
+
+        .chibi-art {
+            font-size: 8px;
+            line-height: 1;
+            white-space: pre;
+            text-align: center;
+            margin-bottom: 5px;
+            color: #d4a574;
+        }
+
+        .chibi-status {
+            font-size: 9px;
+            text-align: center;
+            font-style: italic;
+        }
+
+        #narrative {
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 500px;
+            text-align: center;
+            padding: 12px 20px;
+            background: rgba(28, 24, 16, 0.95);
+            border: 2px solid #5a4a2a;
+            font-style: italic;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        #narrative.visible {
+            opacity: 1;
+        }
+
+        #watchMode {
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 15px;
+            text-align: center;
+            display: none;
+            background: rgba(80, 60, 30, 0.95);
+        }
+
+        #watchMode.active {
+            display: block;
+        }
+
+        #modeButtons {
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .mode-btn {
+            background: rgba(28, 24, 16, 0.9);
+            border: 2px solid #5a4a2a;
+            color: #d4a574;
+            padding: 8px 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .mode-btn:hover {
+            background: rgba(58, 44, 26, 0.9);
+            border-color: #8b6f47;
+        }
+
+        .mode-btn.active {
+            background: #5a4a2a;
+            border-color: #d4a574;
+            color: #fff;
+        }
+
+        .menu {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(28, 24, 16, 0.98);
+            border: 3px solid #5a4a2a;
+            padding: 30px;
+            z-index: 200;
+            min-width: 500px;
+            max-width: 700px;
+            text-align: center;
+        }
+
+        .menu.hidden {
+            display: none;
+        }
+
+        .menu h1 {
+            font-size: 14px;
+            margin-bottom: 20px;
+            color: #d4a574;
+            white-space: pre;
+            line-height: 1.2;
+        }
+
+        .menu-btn {
+            background: rgba(58, 44, 26, 0.9);
+            border: 2px solid #5a4a2a;
+            color: #d4a574;
+            padding: 12px 25px;
+            margin: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-block;
+            min-width: 200px;
+        }
+
+        .menu-btn:hover {
+            background: #5a4a2a;
+            border-color: #8b6f47;
+            color: #fff;
+        }
+
+        .menu-text {
+            text-align: left;
+            font-size: 11px;
+            line-height: 1.6;
+            margin: 15px 0;
+        }
+
+        #minimap {
+            position: fixed;
+            top: 10px;
+            right: 200px;
+            width: 120px;
+            height: 120px;
+            background: rgba(28, 24, 16, 0.9);
+            border: 2px solid #5a4a2a;
+            padding: 5px;
+            font-size: 7px;
+            line-height: 1;
+            white-space: pre;
+            overflow: hidden;
+        }
+
+        .ascii-title {
+            font-size: 9px;
+            line-height: 1.1;
+            white-space: pre;
+            margin: 15px 0;
+            color: #d4a574;
+        }
+
+        .camp-choice {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(58, 44, 26, 0.5);
+            border: 1px solid #5a4a2a;
+        }
+
+        .location-option {
+            display: inline-block;
+            margin: 5px;
+            padding: 8px 12px;
+            border: 2px solid #5a4a2a;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .location-option:hover {
+            background: #5a4a2a;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="stats" class="ui-panel"></div>
+    <div id="chibi" class="ui-panel">
+        <div class="chibi-art" id="chibiArt"></div>
+        <div class="chibi-status" id="chibiStatus"></div>
+    </div>
+    <div id="narrative" class="ui-panel"></div>
+    <div id="watchMode" class="ui-panel"></div>
+    <div id="minimap" class="ui-panel"></div>
+
+    <div id="modeButtons">
+        <button class="mode-btn active" id="gunBtn">🔫 GUN</button>
+        <button class="mode-btn" id="grabBtn">✋ GRAB</button>
+        <button class="mode-btn" id="buildBtn">🏠 BUILD</button>
+    </div>
+
+    <div id="startMenu" class="menu">
+        <h1 class="ascii-title">╔══════════════════════════════════╗
+║  WILD WEST ROGUE                 ║
+║                                  ║
+║    _____                         ║
+║   |o _ o|   Survive the frontier ║
+║   | |_| |   Build your legacy    ║
+║   |_____|   Face your past       ║
+║    |||||                         ║
+║    || ||                         ║
+╚══════════════════════════════════╝</h1>
+        <button class="menu-btn" id="startGameBtn">→ Begin Your Journey</button>
+        <button class="menu-btn" id="watchBtn">👁 Watch Mode (Peaceful)</button>
+        <button class="menu-btn" id="helpBtn">? How to Play</button>
+    </div>
+
+    <div id="watchMenu" class="menu hidden">
+        <h1>Watch Mode</h1>
+        <p class="menu-text">Sit back and observe as a lone wanderer attempts to survive the harsh frontier, seeking peace in a violent land.</p>
+        <button class="menu-btn" id="startWatchBtn">→ Begin Story</button>
+        <button class="menu-btn" id="hideWatchBtn">← Back</button>
+    </div>
+
+    <div id="helpMenu" class="menu hidden">
+        <h1>How to Play</h1>
+        <div class="menu-text">
+<strong>MOVEMENT:</strong> WASD or Arrow Keys
+<strong>MOUSE:</strong> Aim and interact
+
+<strong>THREE MODES:</strong>
+🔫 GUN - Shoot enemies (Shift=wound)
+✋ GRAB - Collect items & enter buildings
+🏠 BUILD - Construct your homestead
+
+<strong>SURVIVE:</strong>
+• Manage hunger, thirst, health
+• Earn coins to buy supplies
+• Choose your path wisely
+
+<strong>CAMP LOCATION:</strong>
+• Find a place you like
+• Build from Bedroll to Ranch
+• Your choice, your story
+        </div>
+        <button class="menu-btn" id="hideHelpBtn">← Back</button>
+    </div>
+
+    <div id="campMenu" class="menu hidden">
+        <h1>Choose Your Camp Location</h1>
+        <p class="menu-text">Where will you make your stand? Your camp will be your refuge in this harsh land.</p>
+        <div class="camp-choice">
+            <div class="location-option" id="lakesideBtn">
+                <strong>🌊 Lakeside</strong><br>
+                Fresh water nearby<br>
+                Peaceful view
+            </div>
+            <div class="location-option" id="mesaBtn">
+                <strong>⛰ Mesa Overlook</strong><br>
+                High vantage point<br>
+                Sunrise view
+            </div>
+            <div class="location-option" id="canyonBtn">
+                <strong>🏜 Canyon Shelter</strong><br>
+                Natural protection<br>
+                Hidden alcove
+            </div>
+            <div class="location-option" id="plainsBtn">
+                <strong>🌾 Open Plains</strong><br>
+                Wide horizons<br>
+                Freedom
+            </div>
+        </div>
+    </div>
+
+<script>
+// ============================================================================
+// WILD WEST ROGUE - Complete Game Code
+// ============================================================================
+
+// GAME CONSTANTS AND STATE VARIABLES
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = 800;
+canvas.height = 600;
+
+// GAME STATE
+let gameRunning = false;
+let watchMode = false;
+let currentMode = 'gun';
+let dayNumber = 1;
+let timeOfDay = 6;
+let weather = 'CLEAR';
+let campLocation = null;
+let selectedCampSpot = null;
+
+// PLAYER STATE
+const player = {
+    x: 400, y: 300,
+    vx: 0, vy: 0,
+    angle: 0,
+    health: 100,
+    maxHealth: 100,
+    hunger: 100,
+    maxHunger: 100,
+    thirst: 100,
+    maxThirst: 100,
+    coins: 10,
+    ammo: 20,
+    kills: 0,
+    guilt: 0,
+    hasHorse: false,
+    speed: 2,
+    homeLevel: 0
+};
+
+// WORLD STATE
+const world = {
+    width: 3000,
+    height: 3000
+};
+
+const camera = {
+    x: 0,
+    y: 0,
+    shake: 0
+};
+
+// INPUT
+const keys = {};
+const mouse = { x: 400, y: 300, down: false, clicked: false };
+
+// ENTITIES
+let enemies = [];
+let items = [];
+let buildings = [];
+let ghosts = [];
+let bullets = [];
+let particles = [];
+
+// TIMERS
+let frameCount = 0;
+let narrativeTimer = 0;
+let narrativeText = '';
+let chibiAnimFrame = 0;
+let chibiState = 'idle_happy';
+
+// TRANSFORMING BUILDINGS
+const BUILDING_TRANSFORMS = {
+    store: {
+        chars: ['#', 'S', 'T', 'O', 'R', 'E'],
+        distances: [200, 150, 120, 90, 60, 30],
+        color: '#8b6f47'
+    },
+    saloon: {
+        chars: ['#', 'S', 'A', 'L', 'O', 'O', 'N'],
+        distances: [220, 180, 150, 120, 90, 60, 30],
+        color: '#d2691e'
+    },
+    church: {
+        chars: ['+', 'C', 'H', 'U', 'R', 'C', 'H'],
+        distances: [220, 180, 150, 120, 90, 60, 30],
+        color: '#f0f0f0'
+    },
+    stable: {
+        chars: ['#', 'S', 'T', 'A', 'B', 'L', 'E'],
+        distances: [220, 180, 150, 120, 90, 60, 30],
+        color: '#8b4513'
+    }
+};
+
+// HOME BUILDING TIERS
+const HOME_TIERS = [
+    { name: 'None', cost: 0, char: ' ', color: '#000' },
+    { name: 'Bedroll', cost: 5, char: '-', color: '#8b7355' },
+    { name: 'Tent', cost: 5, char: '^', color: '#deb887' },
+    { name: 'Shack', cost: 15, char: '⌂', color: '#8b6f47' },
+    { name: 'Cabin', cost: 30, char: '▪', color: '#8b4513' },
+    { name: 'House', cost: 50, char: '■', color: '#a0826d' },
+    { name: 'Ranch', cost: 100, char: '▮', color: '#daa520' }
+];
+
+// CHIBI ANIMATIONS
+const CHIBI_FRAMES = {
+    idle_happy: [
+        '  o  \n /|\\ \n / \\ ',
+        '  o  \n /|\\ \n/ \\ '
+    ],
+    idle_tired: [
+        '  -  \n /|\\ \n / \\ ',
+        '  -  \n /|\\ \n/ \\ '
+    ],
+    idle_hungry: [
+        '  o  \n/|\\ \n / \\ ',
+        '  o  \n /|\\\n/ \\ '
+    ],
+    eating: [
+        '  o *\n /|\\\n / \\',
+        '  o* \n /|\\\n / \\'
+    ],
+    drinking: [
+        '  o~ \n /|\\\n / \\',
+        '  o ~\n /|\\\n / \\'
+    ],
+    dead: ['  x_x\n  /|\\\n  / \\'],
+    worried: [
+        '  O  \n /|\\ \n / \\ ',
+        '  o  \n /|\\ \n / \\ '
+    ],
+    building: [
+        '  o  \n<|*|>\n / \\ ',
+        '  o  \n |*| \n / \\ '
+    ],
+    riding: [
+        '  o  \n /|\\ \n_|||_',
+        '  o  \n /|\\ \n _|||_ '
+    ],
+    shooting: [
+        '  o  \n /|=>\n / \\ ',
+        '  o  \n /|= \n / \\ '
+    ]
+};
+
+// NARRATIVE TEXTS
+const NARRATIVES = {
+    walk: [
+        'Your boots kick up dust...',
+        'The frontier stretches endlessly...',
+        'Tumbleweed rolls by...',
+        'Sweat drips under the hot sun...'
+    ],
+    pickupCoin: [
+        'A glint of gold catches your eye.',
+        'Fortune favors the bold...',
+        'Every coin brings you closer.',
+        'Honest money earned.'
+    ],
+    pickupFood: [
+        'Provisions for the road ahead.',
+        'A wanderer must eat to survive.',
+        'Hunger is a cruel companion.',
+        'You pocket the rations gratefully.'
+    ],
+    pickupWater: [
+        'Water... more precious than gold.',
+        'Your canteen sloshes with fresh water.',
+        'In the desert, water is life.',
+        'You drink deep and feel renewed.'
+    ],
+    combat: [
+        'The crack of gunfire echoes!',
+        'Smoke drifts from the barrel...',
+        'Another shot rings out.',
+        'Your aim is true.'
+    ],
+    kill: [
+        'Blood stains the dust.',
+        'Another soul claimed.',
+        'The weight grows heavier...',
+        'Was there another way?'
+    ],
+    firstKill: [
+        'The first is always the hardest...',
+        'A line has been crossed.',
+        'You can\'t take it back.',
+        'The frontier changes everyone.'
+    ],
+    guilt: [
+        'The ghosts won\'t leave you be...',
+        'Their whispers haunt you.',
+        'You feel the weight of it all.',
+        'Can you find redemption?'
+    ],
+    building: [
+        'Building something that lasts...',
+        'A place to call your own.',
+        'Shelter from the harsh world.',
+        'Your legacy takes shape.'
+    ],
+    ambient: [
+        'Wind howls across the plains...',
+        'A buzzard circles overhead.',
+        'The sun beats down mercilessly.',
+        'Somewhere, a coyote howls.'
+    ]
+};
+
+const FLAVOR_TEXTS = {
+    campLakeside: [
+        'The water laps gently at the shore...',
+        'Fish jump in the crystal waters.',
+        'A peaceful place to rest your head.'
+    ],
+    campMesa: [
+        'The view stretches for miles...',
+        'Eagles soar on thermal winds.',
+        'You can see trouble coming from here.'
+    ],
+    campCanyon: [
+        'The walls shelter you from wind.',
+        'Ancient rock formations surround you.',
+        'Hidden from prying eyes.'
+    ],
+    campPlains: [
+        'Endless horizons in all directions...',
+        'The grass waves like an ocean.',
+        'Freedom, pure and simple.'
+    ],
+    sunrise: [
+        'Another day dawns in the west...',
+        'The sun bleeds red on the horizon.',
+        'Morning comes, whether you\'re ready or not.'
+    ],
+    sunset: [
+        'The day dies in a blaze of glory...',
+        'Shadows grow long across the land.',
+        'Night falls like a curtain.'
+    ],
+    storm: [
+        'The sky darkens with fury...',
+        'Nature shows no mercy out here.',
+        'The storm cares not for your plans.'
+    ]
+};
+
+const LOCATION_DECORATIONS = {
+    lakeside: '~≈~',
+    mesa: '⛰',
+    canyon: '▓',
+    plains: '≋'
+};
+
+// ============================================================================
+// MENU FUNCTIONS
+// ============================================================================
+
+function startGame() {
+    document.getElementById('startMenu').classList.add('hidden');
+    document.getElementById('campMenu').classList.remove('hidden');
+}
+
+function showWatch() {
+    document.getElementById('startMenu').classList.add('hidden');
+    document.getElementById('watchMenu').classList.remove('hidden');
+}
+
+function hideWatch() {
+    document.getElementById('watchMenu').classList.add('hidden');
+    document.getElementById('startMenu').classList.remove('hidden');
+}
+
+function showHelp() {
+    document.getElementById('startMenu').classList.add('hidden');
+    document.getElementById('helpMenu').classList.remove('hidden');
+}
+
+function hideHelp() {
+    document.getElementById('helpMenu').classList.add('hidden');
+    document.getElementById('startMenu').classList.remove('hidden');
+}
+
+function selectCamp(location) {
+    campLocation = location;
+    document.getElementById('campMenu').classList.add('hidden');
+    gameRunning = true;
+    watchMode = false;
+    init();
+}
+
+function startWatch() {
+    campLocation = 'plains';
+    document.getElementById('watchMenu').classList.add('hidden');
+    document.getElementById('watchMode').classList.add('active');
+    document.getElementById('watchMode').textContent = '👁 WATCH MODE - Peaceful Path';
+    gameRunning = true;
+    watchMode = true;
+    init();
+}
+
+function setMode(mode) {
+    if (watchMode) return;
+    currentMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(mode + 'Btn').classList.add('active');
+}
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+function init() {
+    // Set camp position based on location
+    const campPositions = {
+        lakeside: { x: 500, y: 500 },
+        mesa: { x: 2500, y: 500 },
+        canyon: { x: 500, y: 2500 },
+        plains: { x: 1500, y: 1500 }
+    };
+
+    const pos = campPositions[campLocation] || { x: 1500, y: 1500 };
+    player.x = pos.x;
+    player.y = pos.y;
+    selectedCampSpot = { ...pos };
+
+    // Reset player
+    player.health = 100;
+    player.hunger = 100;
+    player.thirst = 100;
+    player.coins = 10;
+    player.ammo = 20;
+    player.kills = 0;
+    player.guilt = 0;
+    player.hasHorse = false;
+    player.homeLevel = 0;
+
+    // Clear entities
+    enemies = [];
+    items = [];
+    bullets = [];
+    particles = [];
+    ghosts = [];
+
+    // Generate world
+    generateBuildings();
+    generateEnemies();
+    generateItems();
+
+    // Start game loop
+    gameLoop();
+}
+
+function generateBuildings() {
+    buildings = [
+        { type: 'store', x: 1000, y: 800, name: 'General Store' },
+        { type: 'saloon', x: 1200, y: 800, name: 'Saloon' },
+        { type: 'church', x: 1400, y: 800, name: 'Church' },
+        { type: 'stable', x: 1600, y: 800, name: 'Stable' }
+    ];
+}
+
+function generateEnemies() {
+    for (let i = 0; i < 15; i++) {
+        enemies.push({
+            x: Math.random() * world.width,
+            y: Math.random() * world.height,
+            vx: 0,
+            vy: 0,
+            health: 50,
+            maxHealth: 50,
+            active: true,
+            type: 'bandit',
+            lastShot: 0
+        });
+    }
+}
+
+function generateItems() {
+    const itemTypes = ['coin', 'food', 'water', 'ammo'];
+    for (let i = 0; i < 30; i++) {
+        items.push({
+            x: Math.random() * world.width,
+            y: Math.random() * world.height,
+            type: itemTypes[Math.floor(Math.random() * itemTypes.length)],
+            active: true
+        });
+    }
+}
+
+// ============================================================================
+// INPUT HANDLERS
+// ============================================================================
+
+window.addEventListener('keydown', (e) => {
+    keys[e.key.toLowerCase()] = true;
+});
+
+window.addEventListener('keyup', (e) => {
+    keys[e.key.toLowerCase()] = false;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+});
+
+canvas.addEventListener('mousedown', () => {
+    mouse.down = true;
+    mouse.clicked = true;
+});
+
+canvas.addEventListener('mouseup', () => {
+    mouse.down = false;
+});
+
+// ============================================================================
+// GAME LOOP
+// ============================================================================
+
+function gameLoop() {
+    if (!gameRunning) return;
+
+    frameCount++;
+    update();
+    render();
+
+    requestAnimationFrame(gameLoop);
+}
+
+// ============================================================================
+// UPDATE LOGIC
+// ============================================================================
+
+function update() {
+    updatePlayer();
+    updateEnemies();
+    updateBullets();
+    updateParticles();
+    updateGhosts();
+    updateTime();
+    updateCamera();
+    updateChibi();
+    updateNarrative();
+    updateWatch();
+    checkVictory();
+
+    // Add contextual narrative
+    if (frameCount % 300 === 0) {
+        addContextualNarrative();
+    }
+}
+
+function updatePlayer() {
+    if (watchMode) {
+        updateWatchAI();
+        return;
+    }
+
+    // Movement
+    player.vx = 0;
+    player.vy = 0;
+
+    if (keys['w'] || keys['arrowup']) player.vy = -1;
+    if (keys['s'] || keys['arrowdown']) player.vy = 1;
+    if (keys['a'] || keys['arrowleft']) player.vx = -1;
+    if (keys['d'] || keys['arrowright']) player.vx = 1;
+
+    // Normalize diagonal movement
+    if (player.vx !== 0 && player.vy !== 0) {
+        player.vx *= 0.707;
+        player.vy *= 0.707;
+    }
+
+    // Calculate speed with modifiers
+    let speed = player.speed;
+    if (player.hasHorse) speed *= 1.5;
+    if (player.guilt > 0) speed *= Math.max(0.5, 1 - player.guilt / 200);
+    if (weather === 'RAIN') speed *= 0.8;
+    if (weather === 'SANDSTORM') speed *= 0.6;
+
+    player.x += player.vx * speed;
+    player.y += player.vy * speed;
+
+    // Bounds
+    player.x = Math.max(0, Math.min(world.width, player.x));
+    player.y = Math.max(0, Math.min(world.height, player.y));
+
+    // Mouse aiming
+    const dx = mouse.x - canvas.width / 2;
+    const dy = mouse.y - canvas.height / 2;
+    player.angle = Math.atan2(dy, dx);
+
+    // Actions based on mode
+    if (mouse.clicked) {
+        if (currentMode === 'gun' && player.ammo > 0) {
+            shootBullet();
+        } else if (currentMode === 'grab') {
+            grabNearby();
+        } else if (currentMode === 'build') {
+            buildHome();
+        }
+        mouse.clicked = false;
+    }
+
+    // Survival mechanics
+    player.hunger -= 0.015;
+    player.thirst -= 0.02;
+
+    if (weather === 'SANDSTORM') {
+        player.thirst -= 0.01;
+        if (frameCount % 120 === 0) player.health -= 1;
+    }
+
+    if (player.hunger <= 0) {
+        if (frameCount % 180 === 0) player.health -= 2;
+    }
+    if (player.thirst <= 0) {
+        if (frameCount % 120 === 0) player.health -= 3;
+    }
+
+    player.hunger = Math.max(0, player.hunger);
+    player.thirst = Math.max(0, player.thirst);
+    player.health = Math.max(0, Math.min(player.maxHealth, player.health));
+
+    if (player.health <= 0) {
+        endGame('death');
+    }
+}
+
+function updateWatchAI() {
+    // Simple peaceful AI
+    if (frameCount % 180 === 0) {
+        // Move toward camp spot occasionally
+        const dx = selectedCampSpot.x - player.x;
+        const dy = selectedCampSpot.y - player.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist > 100) {
+            player.vx = dx / dist;
+            player.vy = dy / dist;
+        } else {
+            player.vx = (Math.random() - 0.5) * 2;
+            player.vy = (Math.random() - 0.5) * 2;
+        }
+    }
+
+    player.x += player.vx * player.speed * 0.5;
+    player.y += player.vy * player.speed * 0.5;
+
+    // Auto-grab nearby items
+    if (frameCount % 60 === 0) {
+        grabNearby();
+    }
+
+    // Auto-build when have money
+    if (frameCount % 300 === 0 && player.coins >= HOME_TIERS[player.homeLevel + 1]?.cost) {
+        const dx = selectedCampSpot.x - player.x;
+        const dy = selectedCampSpot.y - player.y;
+        if (Math.sqrt(dx*dx + dy*dy) < 100) {
+            buildHome();
+        }
+    }
+
+    // Buy supplies at store
+    if (frameCount % 600 === 0) {
+        buildings.forEach(b => {
+            if (b.type === 'store') {
+                const dx = b.x - player.x;
+                const dy = b.y - player.y;
+                if (Math.sqrt(dx*dx + dy*dy) < 80 && player.coins > 5) {
+                    if (player.hunger < 50 && player.coins >= 3) {
+                        player.hunger += 30;
+                        player.coins -= 3;
+                        showNarrative(NARRATIVES.pickupFood);
+                    }
+                    if (player.thirst < 50 && player.coins >= 2) {
+                        player.thirst += 30;
+                        player.coins -= 2;
+                        showNarrative(NARRATIVES.pickupWater);
+                    }
+                }
+            }
+        });
+    }
+
+    // Bounds
+    player.x = Math.max(0, Math.min(world.width, player.x));
+    player.y = Math.max(0, Math.min(world.height, player.y));
+
+    // Survival
+    player.hunger -= 0.01;
+    player.thirst -= 0.015;
+    player.hunger = Math.max(0, player.hunger);
+    player.thirst = Math.max(0, player.thirst);
+}
+
+function shootBullet() {
+    const shift = keys['shift'];
+    bullets.push({
+        x: player.x,
+        y: player.y,
+        vx: Math.cos(player.angle) * 8,
+        vy: Math.sin(player.angle) * 8,
+        nonLethal: shift,
+        active: true,
+        createdAt: frameCount
+    });
+    player.ammo--;
+    camera.shake = 3;
+    showNarrative(NARRATIVES.combat);
+
+    // Muzzle flash particles
+    for (let i = 0; i < 5; i++) {
+        particles.push({
+            x: player.x + Math.cos(player.angle) * 15,
+            y: player.y + Math.sin(player.angle) * 15,
+            vx: (Math.random() - 0.5) * 3,
+            vy: (Math.random() - 0.5) * 3,
+            life: 10,
+            char: '*',
+            color: '#ffaa00'
+        });
+    }
+}
+
+function grabNearby() {
+    // Check items
+    items.forEach(item => {
+        if (!item.active) return;
+        const dx = item.x - player.x;
+        const dy = item.y - player.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist < 40) {
+            item.active = false;
+            switch(item.type) {
+                case 'coin':
+                    player.coins += 1;
+                    showNarrative(NARRATIVES.pickupCoin);
+                    break;
+                case 'food':
+                    player.hunger = Math.min(player.maxHunger, player.hunger + 30);
+                    showNarrative(NARRATIVES.pickupFood);
+                    break;
+                case 'water':
+                    player.thirst = Math.min(player.maxThirst, player.thirst + 35);
+                    showNarrative(NARRATIVES.pickupWater);
+                    break;
+                case 'ammo':
+                    player.ammo += 10;
+                    showNarrative(['You stock up on ammunition.']);
+                    break;
+            }
+
+            // Sparkle particles
+            for (let i = 0; i < 8; i++) {
+                particles.push({
+                    x: item.x,
+                    y: item.y,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4 - 2,
+                    life: 20,
+                    char: '·',
+                    color: '#ffdd00'
+                });
+            }
+        }
+    });
+
+    // Check buildings
+    buildings.forEach(building => {
+        const dx = building.x - player.x;
+        const dy = building.y - player.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist < 60) {
+            enterBuilding(building);
+        }
+    });
+}
+
+function enterBuilding(building) {
+    if (building.type === 'store') {
+        if (player.coins >= 3) {
+            const choice = Math.random();
+            if (choice < 0.33 && player.hunger < 70) {
+                player.hunger = Math.min(player.maxHunger, player.hunger + 40);
+                player.coins -= 3;
+                showNarrative(['You buy some hearty provisions.']);
+            } else if (choice < 0.66 && player.thirst < 70) {
+                player.thirst = Math.min(player.maxThirst, player.thirst + 40);
+                player.coins -= 2;
+                showNarrative(['Fresh water, cool and clear.']);
+            } else if (player.ammo < 15) {
+                player.ammo += 15;
+                player.coins -= 5;
+                showNarrative(['You stock up on ammunition.']);
+            }
+        }
+    } else if (building.type === 'saloon') {
+        if (player.coins >= 2) {
+            player.coins -= 2;
+            player.health = Math.min(player.maxHealth, player.health + 10);
+            showNarrative(['The whiskey burns going down...', 'A brief respite from the hardship.']);
+        }
+    } else if (building.type === 'church') {
+        if (player.guilt > 0 && player.coins >= 5) {
+            player.coins -= 5;
+            player.guilt = Math.max(0, player.guilt - 20);
+            ghosts = ghosts.filter(() => Math.random() > 0.3);
+            showNarrative(['You confess your sins...', 'The burden lifts, if only a little.']);
+            camera.shake = 5;
+        }
+    } else if (building.type === 'stable') {
+        if (!player.hasHorse && player.coins >= 50) {
+            player.coins -= 50;
+            player.hasHorse = true;
+            showNarrative(['A fine horse, strong and true.', 'Your journey will be swifter now.']);
+        }
+    }
+}
+
+function buildHome() {
+    if (!selectedCampSpot) return;
+
+    const dx = selectedCampSpot.x - player.x;
+    const dy = selectedCampSpot.y - player.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+
+    if (dist < 80) {
+        const nextLevel = player.homeLevel + 1;
+        if (nextLevel < HOME_TIERS.length) {
+            const tier = HOME_TIERS[nextLevel];
+            if (player.coins >= tier.cost) {
+                player.coins -= tier.cost;
+                player.homeLevel = nextLevel;
+                showNarrative(NARRATIVES.building);
+                camera.shake = 4;
+
+                // Construction particles
+                for (let i = 0; i < 15; i++) {
+                    particles.push({
+                        x: selectedCampSpot.x,
+                        y: selectedCampSpot.y,
+                        vx: (Math.random() - 0.5) * 3,
+                        vy: (Math.random() - 0.5) * 3 - 1,
+                        life: 30,
+                        char: '+',
+                        color: '#8b6f47'
+                    });
+                }
+            }
+        }
+    }
+}
+
+function updateEnemies() {
+    enemies.forEach(enemy => {
+        if (!enemy.active || enemy.health <= 0) return;
+
+        // Simple AI - move toward player if close
+        const dx = player.x - enemy.x;
+        const dy = player.y - enemy.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist < 300 && !watchMode) {
+            enemy.vx = (dx / dist) * 1.5;
+            enemy.vy = (dy / dist) * 1.5;
+
+            // Shoot at player occasionally
+            if (dist < 200 && frameCount - enemy.lastShot > 120) {
+                bullets.push({
+                    x: enemy.x,
+                    y: enemy.y,
+                    vx: (dx / dist) * 6,
+                    vy: (dy / dist) * 6,
+                    enemyBullet: true,
+                    active: true
+                });
+                enemy.lastShot = frameCount;
+            }
+        } else {
+            // Wander
+            if (frameCount % 120 === 0) {
+                enemy.vx = (Math.random() - 0.5) * 2;
+                enemy.vy = (Math.random() - 0.5) * 2;
+            }
+        }
+
+        enemy.x += enemy.vx;
+        enemy.y += enemy.vy;
+
+        // Bounds
+        enemy.x = Math.max(0, Math.min(world.width, enemy.x));
+        enemy.y = Math.max(0, Math.min(world.height, enemy.y));
+    });
+}
+
+function updateBullets() {
+    bullets.forEach(bullet => {
+        if (!bullet.active) return;
+
+        bullet.x += bullet.vx;
+        bullet.y += bullet.vy;
+
+        // Check collision with enemies
+        if (!bullet.enemyBullet) {
+            enemies.forEach(enemy => {
+                if (!enemy.active) return;
+                const dx = enemy.x - bullet.x;
+                const dy = enemy.y - bullet.y;
+                if (Math.sqrt(dx*dx + dy*dy) < 20) {
+                    bullet.active = false;
+
+                    if (bullet.nonLethal) {
+                        enemy.health -= 25;
+                        showNarrative(['A wounding shot...']);
+                    } else {
+                        enemy.health -= 50;
+                    }
+
+                    // Blood particles
+                    for (let i = 0; i < 8; i++) {
+                        particles.push({
+                            x: enemy.x,
+                            y: enemy.y,
+                            vx: (Math.random() - 0.5) * 4,
+                            vy: (Math.random() - 0.5) * 4,
+                            life: 20,
+                            char: '·',
+                            color: '#8b0000'
+                        });
+                    }
+
+                    if (enemy.health <= 0) {
+                        enemy.active = false;
+                        player.kills++;
+                        player.guilt += 10;
+                        player.coins += 3;
+
+                        if (player.kills === 1) {
+                            showNarrative(NARRATIVES.firstKill);
+                        } else {
+                            showNarrative(NARRATIVES.kill);
+                        }
+
+                        // Spawn ghost
+                        ghosts.push({
+                            x: enemy.x,
+                            y: enemy.y,
+                            vx: 0,
+                            vy: 0,
+                            opacity: 0.6,
+                            whisper: '...why...'
+                        });
+
+                        camera.shake = 6;
+                    }
+                }
+            });
+        } else {
+            // Enemy bullet hits player
+            const dx = player.x - bullet.x;
+            const dy = player.y - bullet.y;
+            if (Math.sqrt(dx*dx + dy*dy) < 15) {
+                bullet.active = false;
+                player.health -= 15;
+                camera.shake = 8;
+            }
+        }
+
+        // Out of bounds
+        if (bullet.x < 0 || bullet.x > world.width || bullet.y < 0 || bullet.y > world.height) {
+            bullet.active = false;
+        }
+    });
+
+    bullets = bullets.filter(b => b.active);
+}
+
+function updateParticles() {
+    particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.2; // Gravity
+        p.life--;
+    });
+
+    particles = particles.filter(p => p.life > 0);
+}
+
+function updateGhosts() {
+    ghosts.forEach(ghost => {
+        // Circle around player
+        const dx = player.x - ghost.x;
+        const dy = player.y - ghost.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist > 100) {
+            ghost.vx = (dx / dist) * 0.5;
+            ghost.vy = (dy / dist) * 0.5;
+        } else {
+            // Orbit
+            const angle = Math.atan2(dy, dx) + 0.02;
+            ghost.x = player.x - Math.cos(angle) * 80;
+            ghost.y = player.y - Math.sin(angle) * 80;
+        }
+
+        ghost.x += ghost.vx;
+        ghost.y += ghost.vy;
+    });
+}
+
+function updateTime() {
+    if (frameCount % 300 === 0) {
+        timeOfDay += 0.5;
+        if (timeOfDay >= 24) {
+            timeOfDay = 0;
+            dayNumber++;
+        }
+    }
+
+    // Weather changes
+    if (frameCount % 600 === 0) {
+        const rand = Math.random();
+        if (rand < 0.1) {
+            weather = 'RAIN';
+        } else if (rand < 0.15) {
+            weather = 'SANDSTORM';
+        } else {
+            weather = 'CLEAR';
+        }
+    }
+}
+
+function updateCamera() {
+    camera.x = player.x - canvas.width / 2;
+    camera.y = player.y - canvas.height / 2;
+
+    if (camera.shake > 0) {
+        camera.x += (Math.random() - 0.5) * camera.shake;
+        camera.y += (Math.random() - 0.5) * camera.shake;
+        camera.shake *= 0.9;
+    }
+}
+
+function updateChibi() {
+    chibiAnimFrame++;
+
+    if (player.health <= 0) {
+        chibiState = 'dead';
+    } else if (currentMode === 'build' && frameCount % 100 < 50) {
+        chibiState = 'building';
+    } else if (player.hasHorse && (player.vx !== 0 || player.vy !== 0)) {
+        chibiState = 'riding';
+    } else if (bullets.some(b => !b.enemyBullet && b.createdAt && frameCount - b.createdAt < 10)) {
+        chibiState = 'shooting';
+    } else if (player.hunger < 20) {
+        chibiState = 'idle_hungry';
+    } else if (player.health < 30 || player.thirst < 20) {
+        chibiState = 'idle_tired';
+    } else if (player.guilt > 50) {
+        chibiState = 'worried';
+    } else {
+        chibiState = 'idle_happy';
+    }
+
+    const frames = CHIBI_FRAMES[chibiState];
+    if (!frames) return;
+
+    const frameIndex = Math.floor(chibiAnimFrame / 30) % frames.length;
+    document.getElementById('chibiArt').textContent = frames[frameIndex];
+
+    let status = '';
+    if (player.health <= 0) {
+        status = 'Gone to dust...';
+    } else if (player.guilt > 50) {
+        status = 'Haunted...';
+    } else if (player.hunger < 30) {
+        status = 'Starving';
+    } else if (player.thirst < 30) {
+        status = 'Parched';
+    } else if (player.health < 50) {
+        status = 'Wounded';
+    } else if (player.homeLevel >= 6) {
+        status = 'Home at last';
+    } else if (player.hasHorse) {
+        status = 'Riding free';
+    } else {
+        status = 'Wandering...';
+    }
+    document.getElementById('chibiStatus').textContent = status;
+}
+
+function updateNarrative() {
+    if (narrativeTimer > 0) {
+        narrativeTimer--;
+        if (narrativeTimer === 0) {
+            document.getElementById('narrative').classList.remove('visible');
+        }
+    }
+
+    // Random ambient narrative
+    if (frameCount % 900 === 0 && narrativeTimer === 0) {
+        showNarrative(NARRATIVES.ambient);
+    }
+}
+
+function updateWatch() {
+    if (!watchMode) return;
+
+    // Update watch mode status
+    const status = `👁 WATCH MODE | Day ${dayNumber} | ${HOME_TIERS[player.homeLevel].name}`;
+    document.getElementById('watchMode').textContent = status;
+}
+
+function showNarrative(textArray) {
+    const randomText = Array.isArray(textArray) ?
+        textArray[Math.floor(Math.random() * textArray.length)] : textArray;
+    document.getElementById('narrative').textContent = randomText;
+    document.getElementById('narrative').classList.add('visible');
+    narrativeTimer = 180;
+}
+
+function addContextualNarrative() {
+    if (!selectedCampSpot) return;
+
+    const dx = selectedCampSpot.x - player.x;
+    const dy = selectedCampSpot.y - player.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+
+    if (dist < 150 && frameCount % 600 === 0) {
+        const campTexts = FLAVOR_TEXTS['camp' + campLocation.charAt(0).toUpperCase() + campLocation.slice(1)];
+        if (campTexts) {
+            showNarrative(campTexts);
+        }
+    }
+
+    // Time-based narratives
+    if (Math.floor(timeOfDay) === 6 && frameCount % 60 === 0 && narrativeTimer === 0) {
+        showNarrative(FLAVOR_TEXTS.sunrise);
+    }
+
+    if (Math.floor(timeOfDay) === 18 && frameCount % 60 === 0 && narrativeTimer === 0) {
+        showNarrative(FLAVOR_TEXTS.sunset);
+    }
+
+    if (weather !== 'CLEAR' && frameCount % 400 === 0 && narrativeTimer === 0) {
+        showNarrative(FLAVOR_TEXTS.storm);
+    }
+}
+
+function checkVictory() {
+    // Peaceful victory - build ranch without killing
+    if (player.homeLevel >= 6 && player.kills === 0) {
+        endGame('peaceful');
+    }
+
+    // Ranch victory with redemption
+    if (player.homeLevel >= 6 && player.guilt < 20 && player.kills > 0) {
+        endGame('redeemed');
+    }
+}
+
+function endGame(type) {
+    gameRunning = false;
+    let message = '';
+
+    if (type === 'peaceful') {
+        message = `═══════════════════════════════
+         PEACEFUL ENDING
+═══════════════════════════════
+
+Some sought gold in these hills.
+Some sought glory in gunfights.
+
+You found something more precious:
+A place to call home.
+
+Days survived: ${dayNumber}
+Kills: ${player.kills}
+Home built: ${HOME_TIERS[player.homeLevel].name}
+
+"Not all who wander are lost."`;
+    } else if (type === 'redeemed') {
+        message = `═══════════════════════════════
+        REDEMPTION ENDING
+═══════════════════════════════
+
+The blood on your hands cannot be
+washed away, but you tried.
+
+Through confession and penance,
+you built something good from sin.
+
+Days survived: ${dayNumber}
+Kills: ${player.kills}
+Guilt cleansed: ${player.guilt}
+
+"Every saint has a past..."`;
+    } else {
+        message = `═══════════════════════════════
+           THE END
+═══════════════════════════════
+
+The frontier claims another soul.
+
+Days survived: ${dayNumber}
+Kills: ${player.kills}
+Final home: ${HOME_TIERS[player.homeLevel].name}
+
+The dust remembers all.`;
+    }
+
+    setTimeout(() => {
+        alert(message);
+        location.reload();
+    }, 500);
+}
+
+// ============================================================================
+// RENDER FUNCTIONS
+// ============================================================================
+
+function render() {
+    // Clear canvas
+    ctx.fillStyle = getSkyColor();
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw ground
+    ctx.fillStyle = '#b8956a';
+    ctx.fillRect(0, canvas.height * 0.6, canvas.width, canvas.height * 0.4);
+
+    // Translate for camera
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
+
+    // Draw world elements
+    drawTerrain();
+    drawLocationDecor();
+    drawItems();
+    drawBuildings();
+    drawEnemies();
+    drawPlayer();
+    drawBullets();
+    drawGhosts();
+    drawParticles();
+    drawCamp();
+
+    ctx.restore();
+
+    // Draw UI
+    drawStats();
+    drawMinimap();
+    drawWeatherEffects();
+}
+
+function getSkyColor() {
+    if (weather === 'SANDSTORM') return '#8b7355';
+    if (weather === 'RAIN') return '#4a5568';
+
+    if (timeOfDay >= 6 && timeOfDay < 8) return '#ff9a56'; // Dawn
+    if (timeOfDay >= 8 && timeOfDay < 18) return '#87ceeb'; // Day
+    if (timeOfDay >= 18 && timeOfDay < 20) return '#ff6b35'; // Dusk
+    return '#1a1a2e'; // Night
+}
+
+function drawTerrain() {
+    // Draw cacti and rocks
+    ctx.font = '16px Courier New';
+
+    for (let i = 0; i < 50; i++) {
+        const x = (i * 137) % world.width;
+        const y = (i * 241) % world.height;
+
+        if (isVisible(x, y)) {
+            if (i % 3 === 0) {
+                ctx.fillStyle = '#228b22';
+                ctx.fillText('↟', x, y); // Cactus
+            } else {
+                ctx.fillStyle = '#696969';
+                ctx.fillText('●', x, y); // Rock
+            }
+        }
+    }
+}
+
+function drawLocationDecor() {
+    if (!selectedCampSpot || !campLocation) return;
+
+    const decor = LOCATION_DECORATIONS[campLocation];
+    if (!decor) return;
+
+    ctx.font = '14px Courier New';
+    ctx.fillStyle = 'rgba(212, 165, 116, 0.5)';
+
+    // Draw decorative elements around camp
+    for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const dist = 60;
+        const x = selectedCampSpot.x + Math.cos(angle) * dist;
+        const y = selectedCampSpot.y + Math.sin(angle) * dist;
+
+        if (isVisible(x, y)) {
+            ctx.fillText(decor, x, y);
+        }
+    }
+}
+
+function drawItems() {
+    ctx.font = '14px Courier New';
+
+    items.forEach(item => {
+        if (!item.active || !isVisible(item.x, item.y)) return;
+
+        switch(item.type) {
+            case 'coin':
+                ctx.fillStyle = '#ffd700';
+                ctx.fillText('$', item.x, item.y);
+                break;
+            case 'food':
+                ctx.fillStyle = '#8b4513';
+                ctx.fillText('♦', item.x, item.y);
+                break;
+            case 'water':
+                ctx.fillStyle = '#4682b4';
+                ctx.fillText('~', item.x, item.y);
+                break;
+            case 'ammo':
+                ctx.fillStyle = '#c0c0c0';
+                ctx.fillText('|', item.x, item.y);
+                break;
+        }
+    });
+}
+
+function drawBuildings() {
+    ctx.font = 'bold 20px Courier New';
+
+    buildings.forEach(building => {
+        if (!isVisible(building.x, building.y)) return;
+
+        const dx = building.x - player.x;
+        const dy = building.y - player.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        const transform = BUILDING_TRANSFORMS[building.type];
+        let char = '#';
+
+        if (transform) {
+            for (let i = 0; i < transform.distances.length; i++) {
+                if (dist > transform.distances[i]) {
+                    char = transform.chars[i];
+                    break;
+                }
+            }
+            if (dist <= transform.distances[transform.distances.length - 1]) {
+                char = transform.chars[transform.chars.length - 1];
+            }
+            ctx.fillStyle = transform.color;
+        }
+
+        ctx.fillText(char, building.x - 10, building.y);
+
+        // Draw building name when very close
+        if (dist < 80) {
+            ctx.font = '10px Courier New';
+            ctx.fillStyle = '#d4a574';
+            ctx.fillText(building.name, building.x - 30, building.y - 25);
+            ctx.font = 'bold 20px Courier New';
+        }
+    });
+}
+
+function drawCamp() {
+    if (!selectedCampSpot || !isVisible(selectedCampSpot.x, selectedCampSpot.y)) return;
+
+    const tier = HOME_TIERS[player.homeLevel];
+
+    ctx.font = 'bold 24px Courier New';
+    ctx.fillStyle = tier.color;
+    ctx.fillText(tier.char, selectedCampSpot.x - 12, selectedCampSpot.y);
+
+    // Draw camp name when close
+    const dx = selectedCampSpot.x - player.x;
+    const dy = selectedCampSpot.y - player.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+
+    if (dist < 100 && tier.name !== 'None') {
+        ctx.font = '10px Courier New';
+        ctx.fillStyle = '#d4a574';
+        ctx.fillText(tier.name, selectedCampSpot.x - 20, selectedCampSpot.y - 25);
+    }
+}
+
+function drawEnemies() {
+    ctx.font = '16px Courier New';
+
+    enemies.forEach(enemy => {
+        if (!enemy.active || !isVisible(enemy.x, enemy.y)) return;
+
+        ctx.fillStyle = '#8b0000';
+        ctx.fillText('♠', enemy.x, enemy.y);
+
+        // Health bar
+        if (enemy.health < enemy.maxHealth) {
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(enemy.x - 15, enemy.y - 25, 30 * (enemy.health / enemy.maxHealth), 3);
+        }
+    });
+}
+
+function drawPlayer() {
+    ctx.font = '18px Courier New';
+    ctx.fillStyle = player.hasHorse ? '#8b4513' : '#4169e1';
+
+    // Draw player character
+    if (player.hasHorse) {
+        ctx.fillText('♞', player.x - 10, player.y);
+    } else {
+        ctx.fillText('♟', player.x - 8, player.y);
+    }
+
+    // Draw aim line in gun mode
+    if (currentMode === 'gun' && !watchMode) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(player.x + Math.cos(player.angle) * 40,
+                   player.y + Math.sin(player.angle) * 40);
+        ctx.stroke();
+    }
+
+    // Draw mode indicator
+    ctx.font = '12px Courier New';
+    ctx.fillStyle = '#fff';
+    let modeSymbol = '';
+    if (currentMode === 'gun') modeSymbol = '🔫';
+    else if (currentMode === 'grab') modeSymbol = '✋';
+    else if (currentMode === 'build') modeSymbol = '🏠';
+    ctx.fillText(modeSymbol, player.x - 20, player.y - 20);
+}
+
+function drawBullets() {
+    ctx.fillStyle = '#ffff00';
+    ctx.font = '12px Courier New';
+
+    bullets.forEach(bullet => {
+        if (!bullet.active || !isVisible(bullet.x, bullet.y)) return;
+
+        if (bullet.enemyBullet) {
+            ctx.fillStyle = '#ff4500';
+        } else {
+            ctx.fillStyle = bullet.nonLethal ? '#87ceeb' : '#ffff00';
+        }
+
+        ctx.fillText('•', bullet.x, bullet.y);
+    });
+}
+
+function drawGhosts() {
+    if (ghosts.length === 0) return;
+
+    ctx.font = '16px Courier New';
+
+    ghosts.forEach(ghost => {
+        if (!isVisible(ghost.x, ghost.y)) return;
+
+        // Fade based on time of day
+        let opacity = ghost.opacity;
+        if (timeOfDay >= 6 && timeOfDay < 18) {
+            opacity *= 0.3;
+        }
+
+        ctx.fillStyle = `rgba(200, 200, 255, ${opacity})`;
+        ctx.fillText('~', ghost.x, ghost.y);
+
+        // Draw whisper occasionally
+        if (frameCount % 180 < 60) {
+            ctx.font = '9px Courier New';
+            ctx.fillStyle = `rgba(200, 200, 255, ${opacity * 0.5})`;
+            ctx.fillText(ghost.whisper, ghost.x - 15, ghost.y - 20);
+            ctx.font = '16px Courier New';
+        }
+    });
+}
+
+function drawParticles() {
+    ctx.font = '12px Courier New';
+
+    particles.forEach(particle => {
+        if (!isVisible(particle.x, particle.y)) return;
+
+        const alpha = particle.life / 30;
+        ctx.fillStyle = particle.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+        ctx.fillText(particle.char, particle.x, particle.y);
+    });
+}
+
+function drawWeatherEffects() {
+    if (weather === 'RAIN') {
+        ctx.fillStyle = 'rgba(173, 216, 230, 0.3)';
+        for (let i = 0; i < 100; i++) {
+            const x = (frameCount * 3 + i * 13) % canvas.width;
+            const y = (frameCount * 5 + i * 17) % canvas.height;
+            ctx.fillRect(x, y, 1, 10);
+        }
+    } else if (weather === 'SANDSTORM') {
+        ctx.fillStyle = 'rgba(218, 165, 32, 0.2)';
+        for (let i = 0; i < 150; i++) {
+            const x = (frameCount * 4 + i * 11) % canvas.width;
+            const y = (frameCount * 3 + i * 19) % canvas.height;
+            ctx.fillRect(x, y, 2, 2);
+        }
+    }
+}
+
+function drawStats() {
+    const stats = document.getElementById('stats');
+
+    let weatherIcon = '☀';
+    if (weather === 'RAIN') weatherIcon = '🌧';
+    if (weather === 'SANDSTORM') weatherIcon = '🌪';
+
+    let timeIcon = '☀';
+    if (timeOfDay < 6 || timeOfDay >= 20) timeIcon = '🌙';
+
+    let statsText = `${timeIcon} Day ${dayNumber} - ${Math.floor(timeOfDay)}:00
+${weatherIcon} ${weather}
+
+❤ Health: ${Math.floor(player.health)}/${player.maxHealth}
+🍖 Hunger: ${Math.floor(player.hunger)}/${player.maxHunger}
+💧 Thirst: ${Math.floor(player.thirst)}/${player.maxThirst}
+
+💰 Coins: $${player.coins}
+🔫 Ammo: ${player.ammo}
+☠ Kills: ${player.kills}`;
+
+    if (player.guilt > 0) {
+        statsText += `\n👻 Guilt: ${Math.floor(player.guilt)}`;
+    }
+
+    if (player.hasHorse) {
+        statsText += `\n🐴 Horse`;
+    }
+
+    statsText += `\n🏠 Home: ${HOME_TIERS[player.homeLevel].name}`;
+
+    stats.textContent = statsText.trim();
+}
+
+function drawMinimap() {
+    const minimap = document.getElementById('minimap');
+    const mapWidth = 30;
+    const mapHeight = 30;
+    const scaleX = world.width / mapWidth;
+    const scaleY = world.height / mapHeight;
+
+    let mapStr = '';
+
+    for (let y = 0; y < mapHeight; y++) {
+        for (let x = 0; x < mapWidth; x++) {
+            const worldX = x * scaleX;
+            const worldY = y * scaleY;
+
+            // Check if player is here
+            if (Math.abs(worldX - player.x) < scaleX && Math.abs(worldY - player.y) < scaleY) {
+                mapStr += '@';
+                continue;
+            }
+
+            // Check if camp is here
+            if (selectedCampSpot && Math.abs(worldX - selectedCampSpot.x) < scaleX * 2 &&
+                Math.abs(worldY - selectedCampSpot.y) < scaleY * 2) {
+                mapStr += '■';
+                continue;
+            }
+
+            // Check if building is here
+            let foundBuilding = false;
+            for (let b of buildings) {
+                if (Math.abs(worldX - b.x) < scaleX * 2 && Math.abs(worldY - b.y) < scaleY * 2) {
+                    mapStr += '#';
+                    foundBuilding = true;
+                    break;
+                }
+            }
+            if (foundBuilding) continue;
+
+            // Check if enemy is here
+            let foundEnemy = false;
+            for (let e of enemies) {
+                if (e.active && Math.abs(worldX - e.x) < scaleX && Math.abs(worldY - e.y) < scaleY) {
+                    mapStr += '!';
+                    foundEnemy = true;
+                    break;
+                }
+            }
+            if (foundEnemy) continue;
+
+            // Empty space
+            mapStr += '·';
+        }
+        mapStr += '\n';
+    }
+
+    minimap.textContent = mapStr;
+}
+
+function isVisible(x, y) {
+    const buffer = 100;
+    return x > camera.x - buffer &&
+           x < camera.x + canvas.width + buffer &&
+           y > camera.y - buffer &&
+           y < camera.y + canvas.height + buffer;
+}
+
+// ============================================================================
+// EVENT LISTENERS FOR MENU BUTTONS
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Main menu buttons
+    document.getElementById('startGameBtn').addEventListener('click', startGame);
+    document.getElementById('watchBtn').addEventListener('click', showWatch);
+    document.getElementById('helpBtn').addEventListener('click', showHelp);
+
+    // Watch menu buttons
+    document.getElementById('startWatchBtn').addEventListener('click', startWatch);
+    document.getElementById('hideWatchBtn').addEventListener('click', hideWatch);
+
+    // Help menu button
+    document.getElementById('hideHelpBtn').addEventListener('click', hideHelp);
+
+    // Camp location buttons
+    document.getElementById('lakesideBtn').addEventListener('click', function() { selectCamp('lakeside'); });
+    document.getElementById('mesaBtn').addEventListener('click', function() { selectCamp('mesa'); });
+    document.getElementById('canyonBtn').addEventListener('click', function() { selectCamp('canyon'); });
+    document.getElementById('plainsBtn').addEventListener('click', function() { selectCamp('plains'); });
+
+    // Mode buttons
+    document.getElementById('gunBtn').addEventListener('click', function() { setMode('gun'); });
+    document.getElementById('grabBtn').addEventListener('click', function() { setMode('grab'); });
+    document.getElementById('buildBtn').addEventListener('click', function() { setMode('build'); });
+
+    console.log('Wild West Rogue - Game Loaded');
+    console.log('Press Begin Your Journey to start!');
+});
+
+</script>
+</body>
+</html>
