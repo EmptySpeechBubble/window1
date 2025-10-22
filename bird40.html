@@ -5780,8 +5780,7 @@ if (this.state === BIRD_STATES.FLYING) {
                     }
                 }
 
-                // Clean up old food memory
-                const now = Date.now();
+                // Clean up old food memory (reuse 'now' from earlier)
                 this.foodMemory = this.foodMemory.filter(f => now - f.timestamp < FOOD_KNOWLEDGE_DURATION);
 
                 // Check for owl/crow (predators) to mob
@@ -6072,8 +6071,8 @@ if ((isRaining || timeOfDay >= 1) && Math.random() < 0.4) { // 40% chance to see
                         
                         if (huntTargetDist < 25) { // Increased from 10 - easier to collect food
                             // Check dominance hierarchy - lower aggression birds wait for dominant birds
-                            const flockmates = this.getFlockmates();
-                            const dominantBirdsNearby = flockmates.filter(b =>
+                            // Reuse flockmates declared earlier in update()
+                            const dominantBirdsNearby = this.getFlockmates().filter(b =>
                                 b.aggression > this.aggression &&
                                 distance(this.x, this.y, b.x, b.y) < 50 &&
                                 b.state === BIRD_STATES.HUNTING
@@ -6932,27 +6931,28 @@ if (this.pathIndex >= this.path.length) {
                                     this.findPerch();
            
     
-                                } else if (r < BIRD_STATE_PREFERENCES.PERCHING + BIRD_STATE_PREFERENCES.FEEDING) { 
+                                } else if (r < BIRD_STATE_PREFERENCES.PERCHING + BIRD_STATE_PREFERENCES.FEEDING) {
    // Go to ground to forage
-   const groundY = canvas.height * GROUND_HEIGHT_RATIO - 10;
+   // Reuse groundY from earlier in update() - just reference it
    const targetX = Math.random() * canvas.width;
+   const forageGroundY = canvas.height * GROUND_HEIGHT_RATIO - 10;
 
-   // High chance to hop on ground 
+   // High chance to hop on ground
    if (Math.random() < 0.8) {
        // Create a direct path to ground
        this.path = [
            { x: this.x, y: this.y }, // Current position
-           { x: targetX, y: groundY } // Direct to ground
+           { x: targetX, y: forageGroundY } // Direct to ground
        ];
        this.pathIndex = 0;
-       
+
        // Set flag to mark for hopping once we reach ground
        this.intendToHop = true;
-       
+
        // Clear any existing hop data to ensure fresh start
        this.hopData = null;
-       
-       debugLog(`Bird flying directly to ground at (${targetX}, ${groundY}) to hop`);
+
+       debugLog(`Bird flying directly to ground at (${targetX}, ${forageGroundY}) to hop`);
    }
 
                                 } else {
@@ -6986,9 +6986,9 @@ if (this.pathIndex >= this.path.length) {
         this.velocity = { x: 0, y: 0 };
     }
     
-    // Define groundY once to ensure consistency
-    const groundY = canvas.height * GROUND_HEIGHT_RATIO - 10;
-    
+    // Define hopping ground level once to ensure consistency
+    const hoppingGroundY = canvas.height * GROUND_HEIGHT_RATIO - 10;
+
     // Only stay in hopping state for a reasonable duration
     if (this.stateTimer < BIRD_STATE_DURATION.HOPPING) {
         // Initialize hopping properties if not present
@@ -6999,13 +6999,13 @@ if (this.pathIndex >= this.path.length) {
                 phaseTimer: 0,           // Time in current phase
                 hopHeight: 0,            // Current height of hop
                 nextHopDelay: 2000,      // Time between hops (2 seconds)
-                baseY: groundY,          // Store exact ground level
+                baseY: hoppingGroundY,   // Store exact ground level
                 hopDistance: 0,          // Distance to move in this hop
                 lastX: this.x            // Track position to detect external changes
             };
-            
+
             // Force initial position
-            this.y = groundY;
+            this.y = hoppingGroundY;
             this.velocity.y = 0;
             
             debugLog("HOPPING STATE INITIALIZED - forcing ground position");
@@ -7027,7 +7027,7 @@ if (this.pathIndex >= this.path.length) {
         // CONTROLLED STATE MACHINE
         if (this.hopData.phase === "ground") {
             // Keep bird FIRMLY on ground during ground phase
-            this.y = groundY;
+            this.y = hoppingGroundY;
             
             // Slow x movement while on ground
             this.velocity.x *= 0.9;
@@ -7066,11 +7066,11 @@ if (this.pathIndex >= this.path.length) {
             this.hopData.hopHeight = this.hopData.maxHopHeight * normalizedHeight;
             
             // Apply precise position with arc motion
-            this.y = groundY - this.hopData.hopHeight;
-            
+            this.y = hoppingGroundY - this.hopData.hopHeight;
+
             // Move horizontally during hop - linear movement
             this.x = this.hopData.lastX + (this.hopData.hopDistance * hopProgress);
-            
+
             // Remember position to prevent external interference
             if (hopProgress >= 1) {
                 // Hop complete - back to ground
@@ -7078,9 +7078,9 @@ if (this.pathIndex >= this.path.length) {
                 this.hopData.phaseTimer = 0;
                 this.hopData.lastX = this.x;
                 this.hopData.nextHopDelay = 800 + Math.random() * 800; // 1.5-3s ground time
-                
+
                 // Force ground position to prevent any drift
-                this.y = groundY;
+                this.y = hoppingGroundY;
                 this.velocity.y = 0;
                 
                 // Start pecking again
