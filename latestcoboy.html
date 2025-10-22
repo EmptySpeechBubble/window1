@@ -242,32 +242,35 @@
     <div id="minimap" class="ui-panel"></div>
 
     <div id="modeButtons">
-        <button class="mode-btn active" id="gunBtn">🔫 GUN</button>
-        <button class="mode-btn" id="grabBtn">✋ GRAB</button>
-        <button class="mode-btn" id="buildBtn">🏠 BUILD</button>
+        <button class="mode-btn active" id="gunBtn">[*] GUN</button>
+        <button class="mode-btn" id="grabBtn">[G] GRAB</button>
+        <button class="mode-btn" id="buildBtn">[B] BUILD</button>
     </div>
 
     <div id="startMenu" class="menu">
-        <h1 class="ascii-title">╔══════════════════════════════════╗
-║  WILD WEST ROGUE                 ║
-║                                  ║
-║    _____                         ║
-║   |o _ o|   Survive the frontier ║
-║   | |_| |   Build your legacy    ║
-║   |_____|   Face your past       ║
-║    |||||                         ║
-║    || ||                         ║
-╚══════════════════════════════════╝</h1>
-        <button class="menu-btn" id="startGameBtn">→ Begin Your Journey</button>
-        <button class="menu-btn" id="watchBtn">👁 Watch Mode (Peaceful)</button>
+        <h1 class="ascii-title">
+    .=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-.
+    |  W I L D   W E S T   R O G U E  |
+    `=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-'
+
+         .---.        The frontier
+        ( o.o )       awaits those
+         > ^ <        brave enough
+        /|   |\       to face it
+         |   |
+        _|   |_
+
+    </h1>
+        <button class="menu-btn" id="startGameBtn">> Begin Your Journey</button>
+        <button class="menu-btn" id="watchBtn">@ Watch Mode (Peaceful AI)</button>
         <button class="menu-btn" id="helpBtn">? How to Play</button>
     </div>
 
     <div id="watchMenu" class="menu hidden">
         <h1>Watch Mode</h1>
         <p class="menu-text">Sit back and observe as a lone wanderer attempts to survive the harsh frontier, seeking peace in a violent land.</p>
-        <button class="menu-btn" id="startWatchBtn">→ Begin Story</button>
-        <button class="menu-btn" id="hideWatchBtn">← Back</button>
+        <button class="menu-btn" id="startWatchBtn">> Begin Story</button>
+        <button class="menu-btn" id="hideWatchBtn">< Back</button>
     </div>
 
     <div id="helpMenu" class="menu hidden">
@@ -277,21 +280,21 @@
 <strong>MOUSE:</strong> Aim and interact
 
 <strong>THREE MODES:</strong>
-🔫 GUN - Shoot enemies (Shift=wound)
-✋ GRAB - Collect items & enter buildings
-🏠 BUILD - Construct your homestead
+ [*] GUN   - Shoot enemies (Shift=wound)
+ [G] GRAB  - Collect items & enter buildings
+ [B] BUILD - Construct your homestead
 
 <strong>SURVIVE:</strong>
-• Manage hunger, thirst, health
-• Earn coins to buy supplies
-• Choose your path wisely
+ * Manage hunger, thirst, health
+ * Earn coins to buy supplies
+ * Choose your path wisely
 
 <strong>CAMP LOCATION:</strong>
-• Find a place you like
-• Build from Bedroll to Ranch
-• Your choice, your story
+ * Find a place you like
+ * Build from Bedroll to Ranch
+ * Your choice, your story
         </div>
-        <button class="menu-btn" id="hideHelpBtn">← Back</button>
+        <button class="menu-btn" id="hideHelpBtn">< Back</button>
     </div>
 
     <div id="campMenu" class="menu hidden">
@@ -299,22 +302,22 @@
         <p class="menu-text">Where will you make your stand? Your camp will be your refuge in this harsh land.</p>
         <div class="camp-choice">
             <div class="location-option" id="lakesideBtn">
-                <strong>🌊 Lakeside</strong><br>
+                <strong>≈≈ Lakeside</strong><br>
                 Fresh water nearby<br>
                 Peaceful view
             </div>
             <div class="location-option" id="mesaBtn">
-                <strong>⛰ Mesa Overlook</strong><br>
+                <strong>▲▲ Mesa Overlook</strong><br>
                 High vantage point<br>
                 Sunrise view
             </div>
             <div class="location-option" id="canyonBtn">
-                <strong>🏜 Canyon Shelter</strong><br>
+                <strong>▓▓ Canyon Shelter</strong><br>
                 Natural protection<br>
                 Hidden alcove
             </div>
             <div class="location-option" id="plainsBtn">
-                <strong>🌾 Open Plains</strong><br>
+                <strong>== Open Plains</strong><br>
                 Wide horizons<br>
                 Freedom
             </div>
@@ -420,13 +423,13 @@ const BUILDING_TRANSFORMS = {
 
 // HOME BUILDING TIERS
 const HOME_TIERS = [
-    { name: 'None', cost: 0, char: ' ', color: '#000' },
+    { name: 'None', cost: 0, char: '.', color: '#555' },
     { name: 'Bedroll', cost: 5, char: '-', color: '#8b7355' },
     { name: 'Tent', cost: 5, char: '^', color: '#deb887' },
-    { name: 'Shack', cost: 15, char: '⌂', color: '#8b6f47' },
-    { name: 'Cabin', cost: 30, char: '▪', color: '#8b4513' },
-    { name: 'House', cost: 50, char: '■', color: '#a0826d' },
-    { name: 'Ranch', cost: 100, char: '▮', color: '#daa520' }
+    { name: 'Shack', cost: 15, char: 'n', color: '#8b6f47' },
+    { name: 'Cabin', cost: 30, char: 'h', color: '#8b4513' },
+    { name: 'House', cost: 50, char: 'H', color: '#a0826d' },
+    { name: 'Ranch', cost: 100, char: '#', color: '#daa520' }
 ];
 
 // CHIBI ANIMATIONS
@@ -573,10 +576,10 @@ const FLAVOR_TEXTS = {
 };
 
 const LOCATION_DECORATIONS = {
-    lakeside: '~≈~',
-    mesa: '⛰',
-    canyon: '▓',
-    plains: '≋'
+    lakeside: '≈',
+    mesa: '^',
+    canyon: '#',
+    plains: '='
 };
 
 // ============================================================================
@@ -620,7 +623,7 @@ function startWatch() {
     campLocation = 'plains';
     document.getElementById('watchMenu').classList.add('hidden');
     document.getElementById('watchMode').classList.add('active');
-    document.getElementById('watchMode').textContent = '👁 WATCH MODE - Peaceful Path';
+    document.getElementById('watchMode').textContent = '[@] WATCH MODE - Peaceful Path';
     gameRunning = true;
     watchMode = true;
     init();
@@ -1341,7 +1344,7 @@ function updateWatch() {
     if (!watchMode) return;
 
     // Update watch mode status
-    const status = `👁 WATCH MODE | Day ${dayNumber} | ${HOME_TIERS[player.homeLevel].name}`;
+    const status = `[@] WATCH MODE | Day ${dayNumber} | ${HOME_TIERS[player.homeLevel].name}`;
     document.getElementById('watchMode').textContent = status;
 }
 
@@ -1497,9 +1500,21 @@ function getSkyColor() {
 }
 
 function drawTerrain() {
-    // Draw cacti and rocks
     ctx.font = '16px Courier New';
 
+    // Draw ground scatter (dust, pebbles, grass)
+    const groundChars = ['.', ',', '\'', '`', '.', '.', ','];
+    for (let i = 0; i < 200; i++) {
+        const x = (i * 73 + frameCount * 0.1) % world.width;
+        const y = (i * 97) % world.height;
+
+        if (isVisible(x, y)) {
+            ctx.fillStyle = 'rgba(139, 115, 85, 0.3)';
+            ctx.fillText(groundChars[i % groundChars.length], x, y);
+        }
+    }
+
+    // Draw cacti and rocks
     for (let i = 0; i < 50; i++) {
         const x = (i * 137) % world.width;
         const y = (i * 241) % world.height;
@@ -1507,10 +1522,10 @@ function drawTerrain() {
         if (isVisible(x, y)) {
             if (i % 3 === 0) {
                 ctx.fillStyle = '#228b22';
-                ctx.fillText('↟', x, y); // Cactus
+                ctx.fillText('i', x, y); // Cactus
             } else {
                 ctx.fillStyle = '#696969';
-                ctx.fillText('●', x, y); // Rock
+                ctx.fillText('o', x, y); // Rock
             }
         }
     }
@@ -1551,7 +1566,7 @@ function drawItems() {
                 break;
             case 'food':
                 ctx.fillStyle = '#8b4513';
-                ctx.fillText('♦', item.x, item.y);
+                ctx.fillText('%', item.x, item.y);
                 break;
             case 'water':
                 ctx.fillStyle = '#4682b4';
@@ -1559,7 +1574,7 @@ function drawItems() {
                 break;
             case 'ammo':
                 ctx.fillStyle = '#c0c0c0';
-                ctx.fillText('|', item.x, item.y);
+                ctx.fillText('!', item.x, item.y);
                 break;
         }
     });
@@ -1625,13 +1640,13 @@ function drawCamp() {
 }
 
 function drawEnemies() {
-    ctx.font = '16px Courier New';
+    ctx.font = 'bold 16px Courier New';
 
     enemies.forEach(enemy => {
         if (!enemy.active || !isVisible(enemy.x, enemy.y)) return;
 
-        ctx.fillStyle = '#8b0000';
-        ctx.fillText('♠', enemy.x, enemy.y);
+        ctx.fillStyle = '#ff0000';
+        ctx.fillText('B', enemy.x, enemy.y);
 
         // Health bar
         if (enemy.health < enemy.maxHealth) {
@@ -1642,15 +1657,11 @@ function drawEnemies() {
 }
 
 function drawPlayer() {
-    ctx.font = '18px Courier New';
-    ctx.fillStyle = player.hasHorse ? '#8b4513' : '#4169e1';
+    ctx.font = 'bold 18px Courier New';
+    ctx.fillStyle = player.hasHorse ? '#ffaa00' : '#00ffff';
 
     // Draw player character
-    if (player.hasHorse) {
-        ctx.fillText('♞', player.x - 10, player.y);
-    } else {
-        ctx.fillText('♟', player.x - 8, player.y);
-    }
+    ctx.fillText('@', player.x - 5, player.y);
 
     // Draw aim line in gun mode
     if (currentMode === 'gun' && !watchMode) {
@@ -1664,13 +1675,13 @@ function drawPlayer() {
     }
 
     // Draw mode indicator
-    ctx.font = '12px Courier New';
+    ctx.font = '10px Courier New';
     ctx.fillStyle = '#fff';
     let modeSymbol = '';
-    if (currentMode === 'gun') modeSymbol = '🔫';
-    else if (currentMode === 'grab') modeSymbol = '✋';
-    else if (currentMode === 'build') modeSymbol = '🏠';
-    ctx.fillText(modeSymbol, player.x - 20, player.y - 20);
+    if (currentMode === 'gun') modeSymbol = '*';
+    else if (currentMode === 'grab') modeSymbol = 'G';
+    else if (currentMode === 'build') modeSymbol = 'B';
+    ctx.fillText(modeSymbol, player.x - 15, player.y - 20);
 }
 
 function drawBullets() {
@@ -1705,7 +1716,7 @@ function drawGhosts() {
         }
 
         ctx.fillStyle = `rgba(200, 200, 255, ${opacity})`;
-        ctx.fillText('~', ghost.x, ghost.y);
+        ctx.fillText('\'', ghost.x, ghost.y);
 
         // Draw whisper occasionally
         if (frameCount % 180 < 60) {
@@ -1718,14 +1729,17 @@ function drawGhosts() {
 }
 
 function drawParticles() {
-    ctx.font = '12px Courier New';
+    ctx.font = '10px Courier New';
 
     particles.forEach(particle => {
         if (!isVisible(particle.x, particle.y)) return;
 
         const alpha = particle.life / 30;
         ctx.fillStyle = particle.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
-        ctx.fillText(particle.char, particle.x, particle.y);
+        // Convert unicode to simple ASCII
+        let char = particle.char;
+        if (char === '·') char = '.';
+        ctx.fillText(char, particle.x, particle.y);
     });
 }
 
@@ -1750,33 +1764,33 @@ function drawWeatherEffects() {
 function drawStats() {
     const stats = document.getElementById('stats');
 
-    let weatherIcon = '☀';
-    if (weather === 'RAIN') weatherIcon = '🌧';
-    if (weather === 'SANDSTORM') weatherIcon = '🌪';
+    let weatherIcon = '*';
+    if (weather === 'RAIN') weatherIcon = '~';
+    if (weather === 'SANDSTORM') weatherIcon = 'S';
 
-    let timeIcon = '☀';
-    if (timeOfDay < 6 || timeOfDay >= 20) timeIcon = '🌙';
+    let timeIcon = '*';
+    if (timeOfDay < 6 || timeOfDay >= 20) timeIcon = '.';
 
     let statsText = `${timeIcon} Day ${dayNumber} - ${Math.floor(timeOfDay)}:00
 ${weatherIcon} ${weather}
 
-❤ Health: ${Math.floor(player.health)}/${player.maxHealth}
-🍖 Hunger: ${Math.floor(player.hunger)}/${player.maxHunger}
-💧 Thirst: ${Math.floor(player.thirst)}/${player.maxThirst}
+HP: ${Math.floor(player.health)}/${player.maxHealth}
+%: ${Math.floor(player.hunger)}/${player.maxHunger}
+~: ${Math.floor(player.thirst)}/${player.maxThirst}
 
-💰 Coins: $${player.coins}
-🔫 Ammo: ${player.ammo}
-☠ Kills: ${player.kills}`;
+$: ${player.coins}
+!: ${player.ammo}
+X: ${player.kills}`;
 
     if (player.guilt > 0) {
-        statsText += `\n👻 Guilt: ${Math.floor(player.guilt)}`;
+        statsText += `\n': ${Math.floor(player.guilt)}`;
     }
 
     if (player.hasHorse) {
-        statsText += `\n🐴 Horse`;
+        statsText += `\nH: Yes`;
     }
 
-    statsText += `\n🏠 Home: ${HOME_TIERS[player.homeLevel].name}`;
+    statsText += `\n#: ${HOME_TIERS[player.homeLevel].name}`;
 
     stats.textContent = statsText.trim();
 }
