@@ -2362,7 +2362,6 @@ if (isTabVisible) {
                 // Swim in circular pattern within pond (slowed down from 0.001 to 0.0003)
                 fish.swimAngle += deltaTime * 0.0003 * speedMultiplier;
                 const radius = Math.min(pond.width, pond.height) * 0.6;
-                const pondCenterY = pond.y + pond.height; // Pond center is below ground level
                 fish.x = pond.x + Math.cos(fish.swimAngle * 2) * radius * 0.7;
                 fish.y = pondCenterY + Math.sin(fish.swimAngle * 2) * radius * 0.4;
 
