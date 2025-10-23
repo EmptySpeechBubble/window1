@@ -161,6 +161,104 @@
         80% { opacity: 1; }
         100% { opacity: 0; }
     }
+
+    .manual-btn {
+        margin-top: 5px;
+        padding: 5px 10px;
+        background: #2196F3;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 12px;
+        width: 100%;
+        transition: background 0.3s;
+    }
+
+    .manual-btn:hover {
+        background: #0b7dda;
+    }
+
+    .instruction-manual {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(255, 255, 255, 0.95);
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        z-index: 1001;
+        display: none;
+        max-width: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
+        color: #333;
+    }
+
+    .instruction-manual h2 {
+        margin-top: 0;
+        color: #2196F3;
+        border-bottom: 2px solid #2196F3;
+        padding-bottom: 10px;
+    }
+
+    .instruction-manual h3 {
+        color: #4CAF50;
+        margin-top: 15px;
+        margin-bottom: 5px;
+    }
+
+    .instruction-manual ul {
+        margin: 5px 0;
+        padding-left: 20px;
+    }
+
+    .instruction-manual li {
+        margin-bottom: 5px;
+    }
+
+    .instruction-manual .close-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: #f44336;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1;
+    }
+
+    .instruction-manual .close-btn:hover {
+        background: #d32f2f;
+    }
+
+    .instruction-manual .section {
+        margin-bottom: 15px;
+        padding: 10px;
+        background: rgba(240, 240, 240, 0.5);
+        border-radius: 5px;
+    }
+
+    .instruction-manual .new-feature {
+        background: rgba(76, 175, 80, 0.1);
+        border-left: 3px solid #4CAF50;
+        padding: 8px;
+        margin: 5px 0;
+    }
+
+    @media (max-width: 768px) {
+        .instruction-manual {
+            max-width: 90vw;
+            max-height: 85vh;
+            padding: 15px;
+            font-size: 12px;
+        }
+    }
 </style>
 </head>
 <body>
@@ -170,6 +268,7 @@
             <h3>Garden Ecosystem</h3>
             <div id="stats"></div>
             <button id="screenshotBtn" class="screenshot-btn">📷 Take Screenshot</button>
+            <button id="manualBtn" class="manual-btn">📖 Guide & Features</button>
         </div>
         <!-- Add missing toggle buttons -->
         <button id="toggleInfo" class="toggle-panel">ℹ️ Show Info</button>
@@ -204,7 +303,170 @@
         </div>
 
     <div id="screenshotMessage" class="screenshot-message">Screenshot saved!</div>
-    
+
+    <!-- Instruction Manual -->
+    <div id="instructionManual" class="instruction-manual">
+        <button class="close-btn" id="closeManualBtn">×</button>
+        <h2>🌿 Garden View Ecosystem - Guide</h2>
+
+        <div class="section">
+            <h3>Welcome, Observer</h3>
+            <p><em>This is a living, breathing ecosystem. The best way to experience it is simply to <strong>watch and observe</strong>. Let the garden unfold naturally before you.</em></p>
+            <p>Each entity has its own life, goals, and personality. Birds build nests, raise families, and communicate. Squirrels forage and climb trees. The weather changes, day turns to night, and a complex web of interactions emerges organically.</p>
+        </div>
+
+        <div class="section">
+            <h3>🎯 Basic Interactions</h3>
+            <ul>
+                <li><strong>Click/Tap anywhere:</strong> Drop food for the birds</li>
+                <li><strong>T key:</strong> Toggle debug visuals (shows paths, states)</li>
+                <li><strong>D key:</strong> Advanced debugging with performance stats</li>
+                <li><strong>C key:</strong> Restore control panel if closed</li>
+                <li><strong>Sun/Moon icon:</strong> Praise to access debug controls</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>🐦 Bird Behavior Systems</h3>
+            <ul>
+                <li><strong>States:</strong> Birds transition between Flying, Perched, Hopping, Pecking, Bathing, Feeding babies, Building nests, and Fleeing</li>
+                <li><strong>Hunger:</strong> Birds actively seek food when hungry (worms, seeds, berries)</li>
+                <li><strong>Nesting:</strong> Non-wild birds collect twigs to build nests in trees. Special golden twigs speed up construction</li>
+                <li><strong>Parenting:</strong> Adult birds feed hungry baby birds, prioritizing critically hungry ones</li>
+                <li><strong>Communication:</strong> Birds chirp to signal danger (Alert), call to flock (Social), announce food (Food Call), and celebrate victories (Victory)</li>
+                <li><strong>Flocking:</strong> Birds of similar types recognize each other and coordinate behaviors</li>
+                <li><strong>Ground behavior:</strong> Birds now spend more time hopping and pecking on the ground, foraging naturally</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>💬 Chirping & Communication</h3>
+            <ul>
+                <li><strong>Random chirping:</strong> Birds chirp while perched or idle, creating ambient life</li>
+                <li><strong>Visual notes:</strong> Musical notes appear above chirping birds (accessibility feature)</li>
+                <li><strong>Chirp types:</strong>
+                    <ul>
+                        <li>🎵 Social - General communication</li>
+                        <li>🌽 Food Call - "Found food here!"</li>
+                        <li>📞 Contact Call - "Where is everyone?"</li>
+                        <li>⚠️ Alert - Warning of danger</li>
+                        <li>🏆 Victory - Won a territorial dispute</li>
+                        <li>🛡️ Territorial - Defending territory</li>
+                    </ul>
+                </li>
+                <li><strong>Synchronized chirping:</strong> Social chirps can trigger nearby birds to chirp back</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>🌳 Trees & Environment</h3>
+            <ul>
+                <li><strong>Tree lifecycle:</strong> Trees age, produce flowers, and eventually fall. New trees regrow</li>
+                <li><strong>Perching:</strong> Birds prefer shelter during rain/night, healthy trees during day</li>
+                <li><strong>Branch traversal:</strong> Squirrels can jump between nearby trees!</li>
+                <li><strong>Flowers:</strong> Appear on healthy trees during the day</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>💧 Water Systems & Ponds</h3>
+            <ul>
+                <li><strong>Puddles:</strong> Form during rain, birds bathe in them</li>
+                <li><strong>Ponds:</strong> Permanent water sources (10% chance to spawn on load)</li>
+                <li><strong>Koi fish:</strong> Swim in ponds, get excited when birds approach, and may jump out of water!</li>
+                <li><strong>Frogs:</strong> Live near ponds, jump away from birds, croak warnings, and catch ants</li>
+                <li><strong>Bird interactions:</strong> Birds visit ponds to drink and bathe, triggering reactions from pond inhabitants</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>🐿️ Squirrels</h3>
+            <ul>
+                <li><strong>Behavior:</strong> Wander, forage for nuts, climb trees</li>
+                <li><strong>Tree climbing:</strong> Squirrels seek nearby trees and climb trunks to eat nuts</li>
+                <li><strong>Branch jumping:</strong> Can leap between trees that are close together</li>
+                <li><strong>Nest raiding:</strong> May damage bird nests if they share a tree</li>
+                <li><strong>Bird interactions:</strong> Birds may chase squirrels from trees</li>
+                <li><strong>Spawn rate:</strong> Reduced to maintain balance</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>🐀 Rats & Rat Kings</h3>
+            <ul>
+                <li><strong>Normal rats:</strong> Scavenge on the ground, flee from owls</li>
+                <li><strong>Rat Kings:</strong> Rare, larger, have crown, attract more rats and owls</li>
+                <li><strong>Owl predation:</strong> Owls hunt rats at night</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>☁️ Weather & Time</h3>
+            <ul>
+                <li><strong>Day/Night cycle:</strong> ~4 minutes per full cycle</li>
+                <li><strong>Rain:</strong> Spawns puddles, worms, affects bird behavior (seek shelter)</li>
+                <li><strong>Thunder:</strong> Can occur during heavy rain with lightning strikes</li>
+                <li><strong>Rainbow:</strong> Rare, appears after rain if conditions are right</li>
+                <li><strong>Night behaviors:</strong> Worms emerge, owls hunt, birds seek birdhouses</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>🏠 Birdhouses</h3>
+            <ul>
+                <li><strong>Construction:</strong> Birds build birdhouses similar to nests</li>
+                <li><strong>Shelter:</strong> During rain or night, birds seek birdhouses for protection</li>
+                <li><strong>Capacity:</strong> Multiple birds can shelter together</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>🎮 Special Features</h3>
+            <ul>
+                <li><strong>Gameboy:</strong> After day 30, an owl may deliver a magical gameboy. Click it to visit a 1-bit window game!</li>
+                <li><strong>Mushroom Mode:</strong> Psychedelic visual mode with rainbow colors and bird trails. Find the magic mushroom to unlock!</li>
+                <li><strong>Scarecrow:</strong> Birds avoid scarecrows. Stays for 1 day/night cycle</li>
+                <li><strong>Wind chimes:</strong> Create soothing sounds</li>
+                <li><strong>Crows:</strong> Visit when worm population is high (30+)</li>
+                <li><strong>Butterflies:</strong> Flutter peacefully through the garden</li>
+                <li><strong>Ants:</strong> Form colonies, frogs eat them</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>💡 Tips & Strategies</h3>
+            <ul>
+                <li><strong>Building a thriving ecosystem:</strong> Add food regularly but don't overfeed. Let birds find their own rhythm</li>
+                <li><strong>Nest success:</strong> Keep trees healthy, scatter twigs, minimize squirrel interference</li>
+                <li><strong>Baby bird survival:</strong> Adult birds will feed babies automatically if food is available</li>
+                <li><strong>Species diversity:</strong> Different bird species have different behaviors - observe closely!</li>
+                <li><strong>Seasonal patterns:</strong> Watch how behavior changes with weather and time of day</li>
+                <li><strong>Balance:</strong> Too many rats? Wait for owls. Too many worms? Crows will visit</li>
+                <li><strong>Photography:</strong> Use the screenshot button to capture special moments!</li>
+            </ul>
+        </div>
+
+        <div class="section new-feature">
+            <h3>✨ New Features (Latest Update)</h3>
+            <ul>
+                <li>🐦 <strong>Enhanced chirping:</strong> Birds chirp randomly while perched and idle for more natural ambient sound</li>
+                <li>🌾 <strong>More ground time:</strong> Birds spend significantly more time hopping and pecking on the ground (95% preference)</li>
+                <li>🐿️ <strong>Squirrel balancing:</strong> Reduced spawn rate and added branch traversal between nearby trees</li>
+                <li>💧 <strong>Pond ecosystem:</strong> 10% chance for pond to spawn on load with koi and frogs</li>
+                <li>🐟 <strong>Koi reactions:</strong> Koi swim faster and jump when birds are nearby</li>
+                <li>🐸 <strong>Frog behaviors:</strong> Frogs jump away from birds and croak with visual sound waves</li>
+                <li>💦 <strong>Bird-pond interaction:</strong> Birds can visit ponds to drink, not just puddles for bathing</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h3>🎨 Philosophy</h3>
+            <p><em>"The garden is most beautiful when observed, not controlled. Let it breathe. Let it live. You are a guest in their world."</em></p>
+            <p>This ecosystem simulates complex emergent behaviors. No two sessions are alike. Birds will surprise you. Storms will come and go. Life finds a way.</p>
+            <p><strong>Relax. Watch. Enjoy. 🌿</strong></p>
+        </div>
+    </div>
+
     <script>
         // V38 // GAMEBOY BROUGHT BY OWL / 1BIT WINDOW LINK ADDED 
         //  - GROUND HOPPING wip // KING RAINBOWBIRD // PRAISE THE SUN / MOON FOR DEBUG MODE ACCESS DESKTOP
@@ -14290,7 +14552,36 @@ if (antHill) {
     if (screenshotBtn) {
         screenshotBtn.addEventListener('click', takeScreenshot);
     }
-            
+
+    // Instruction manual toggle
+    const manualBtn = document.getElementById('manualBtn');
+    const instructionManual = document.getElementById('instructionManual');
+    const closeManualBtn = document.getElementById('closeManualBtn');
+
+    if (manualBtn && instructionManual) {
+        manualBtn.addEventListener('click', () => {
+            instructionManual.style.display = 'block';
+            debugLog("Instruction manual opened");
+        });
+    }
+
+    if (closeManualBtn && instructionManual) {
+        closeManualBtn.addEventListener('click', () => {
+            instructionManual.style.display = 'none';
+            debugLog("Instruction manual closed");
+        });
+    }
+
+    // Close manual when clicking outside of it
+    if (instructionManual) {
+        instructionManual.addEventListener('click', (e) => {
+            if (e.target === instructionManual) {
+                instructionManual.style.display = 'none';
+                debugLog("Instruction manual closed (clicked outside)");
+            }
+        });
+    }
+
             const addFoodBtn = document.getElementById('addFoodBtn');
             addFoodBtn.addEventListener('click', () => {
                 scatterFood(canvas.width/2, canvas.height * GROUND_HEIGHT_RATIO, 10);
