@@ -319,8 +319,6 @@
             <h3>🎯 Basic Interactions</h3>
             <ul>
                 <li><strong>Click/Tap anywhere:</strong> Drop food for the birds</li>
-                <li><strong>C key:</strong> Restore control panel if closed</li>
-                <li><strong>Sun/Moon icon:</strong> Access controls</li>
             </ul>
         </div>
 
@@ -2225,16 +2223,19 @@ if (isTabVisible) {
         // Draw ponds (permanent water features)
         function drawPonds() {
             ponds.forEach(pond => {
+                // Draw pond with top edge at ground level (center below ground)
+                const drawY = pond.y + pond.height;
+
                 // Pond base - simplified solid colors for better performance
                 ctx.fillStyle = mushroomMode ? getMushroomColor('rgba(50, 110, 190, 0.85)') : 'rgba(50, 110, 190, 0.85)';
                 ctx.beginPath();
-                ctx.ellipse(pond.x, pond.y, pond.width, pond.height, 0, 0, Math.PI * 2);
+                ctx.ellipse(pond.x, drawY, pond.width, pond.height, 0, 0, Math.PI * 2);
                 ctx.fill();
 
                 // Reflections/highlights
                 ctx.fillStyle = mushroomMode ? getMushroomColor('rgba(200, 220, 255, 0.3)') : 'rgba(200, 220, 255, 0.3)';
                 ctx.beginPath();
-                ctx.ellipse(pond.x - pond.width * 0.2, pond.y - pond.height * 0.3, pond.width * 0.3, pond.height * 0.2, 0, 0, Math.PI * 2);
+                ctx.ellipse(pond.x - pond.width * 0.2, drawY - pond.height * 0.3, pond.width * 0.3, pond.height * 0.2, 0, 0, Math.PI * 2);
                 ctx.fill();
 
                 // Draw ripples - limit to visible ripples for performance
@@ -2319,8 +2320,9 @@ if (isTabVisible) {
                 if (!pond) return;
 
                 // Check for nearby birds - koi get excited and swim faster
+                const pondCenterY = pond.y + pond.height; // Pond center is below ground level
                 const nearbyBird = birds.find(bird =>
-                    distance(bird.x, bird.y, pond.x, pond.y) < 100 &&
+                    distance(bird.x, bird.y, pond.x, pondCenterY) < 100 &&
                     bird.y > pond.y - 50 // Bird is close to pond level
                 );
 
@@ -2360,8 +2362,9 @@ if (isTabVisible) {
                 // Swim in circular pattern within pond (slowed down from 0.001 to 0.0003)
                 fish.swimAngle += deltaTime * 0.0003 * speedMultiplier;
                 const radius = Math.min(pond.width, pond.height) * 0.6;
+                const pondCenterY = pond.y + pond.height; // Pond center is below ground level
                 fish.x = pond.x + Math.cos(fish.swimAngle * 2) * radius * 0.7;
-                fish.y = pond.y + Math.sin(fish.swimAngle * 2) * radius * 0.4;
+                fish.y = pondCenterY + Math.sin(fish.swimAngle * 2) * radius * 0.4;
 
                 // Adjust y for jump height
                 if (fish.jumping) {
@@ -2645,7 +2648,28 @@ document.addEventListener('visibilitychange', function() {
                     puddle.x *= scaleX;
                     puddle.y = newGroundLevel + 3; // Puddles always on ground
                 });
-                
+
+                // Update ponds - keep them at ground level
+                ponds.forEach(pond => {
+                    pond.x *= scaleX;
+                    pond.y = newGroundLevel; // Ponds stay at ground level
+                });
+
+                // Update frogs - keep them at ground level
+                frogs.forEach(frog => {
+                    frog.x *= scaleX;
+                    frog.y = newGroundLevel; // Frogs stay at ground level
+                    // Update jump targets if currently jumping
+                    if (frog.jumping) {
+                        frog.jumpTargetX *= scaleX;
+                        frog.jumpTargetY = newGroundLevel;
+                        frog.jumpStartX *= scaleX;
+                        frog.jumpStartY = newGroundLevel;
+                    }
+                });
+
+                // Koi positions are relative to pond center, will auto-update based on pond position
+
                 nests.forEach(nest => {
             // If nest has an associated tree, adjust position relative to tree
             if (nest.tree && trees.includes(nest.tree)) {
