@@ -1121,6 +1121,7 @@ let timeOfDay = 0.75; // Track day/night cycle (0-1 = day, 1-2 = night)
 let previousTimeOfDay = 0.75; // For tracking day/night transitions
 let dayNightCycleCount = 0; // Count completed day/night cycles
 let rainbowsShown = 0; // Track number of rainbows that have appeared
+let rainsCompleted = 0; // Track number of completed rain events (for pond formation)
         
         // Wind Chime Sound Effect System
         let windChimeEnabled = false;
@@ -1620,6 +1621,55 @@ function createFlower(x, y) {
 isThundering = false;
 wasRaining = true; // Set flag when rain just stopped
 
+// Increment rain counter
+rainsCompleted++;
+debugLog(`Rain event completed. Total rains: ${rainsCompleted}`);
+
+// After 5 rains, spawn a permanent pond
+if (rainsCompleted >= 5 && ponds.length === 0) {
+    const pondX = 100 + Math.random() * (canvas.width - 200);
+    const pondWidth = 100 + Math.random() * 60;
+    const pondHeight = 50 + Math.random() * 30;
+    const pondY = canvas.height * GROUND_HEIGHT_RATIO + pondHeight / 2;
+
+    ponds.push({
+        x: pondX,
+        y: pondY,
+        width: pondWidth,
+        height: pondHeight,
+        rippleTimer: 0,
+        ripples: []
+    });
+
+    debugLog(`Natural pond formed after ${rainsCompleted} rains at (${pondX}, ${pondY})`);
+
+    // Spawn a couple of koi in the pond
+    koi.push({
+        x: pondX,
+        y: pondY,
+        pondIndex: 0,
+        swimAngle: Math.random() * Math.PI * 2,
+        color: '#FF6B00'
+    });
+    koi.push({
+        x: pondX,
+        y: pondY,
+        pondIndex: 0,
+        swimAngle: Math.random() * Math.PI * 2,
+        color: '#FFD700'
+    });
+
+    // Spawn a frog near the pond
+    frogs.push({
+        x: pondX + (Math.random() - 0.5) * 60,
+        y: canvas.height * GROUND_HEIGHT_RATIO,
+        jumpTimer: 0,
+        tongueOut: false
+    });
+
+    debugLog(`Pond ecosystem spawned: 2 koi and 1 frog`);
+}
+
 // Only create puddles if tab is visible
 if (isTabVisible) {
     createPuddles(); // Create puddles when rain stops
@@ -2009,8 +2059,8 @@ if (isTabVisible) {
                 const pond = ponds[fish.pondIndex];
                 if (!pond) return;
 
-                // Swim in circular pattern within pond
-                fish.swimAngle += deltaTime * 0.001;
+                // Swim in circular pattern within pond (slowed down from 0.001 to 0.0003)
+                fish.swimAngle += deltaTime * 0.0003;
                 const radius = Math.min(pond.width, pond.height) * 0.6;
                 fish.x = pond.x + Math.cos(fish.swimAngle * 2) * radius * 0.7;
                 fish.y = pond.y + Math.sin(fish.swimAngle * 2) * radius * 0.4;
@@ -7374,23 +7424,16 @@ if (this.pathIndex >= this.path.length) {
     // Only exit hopping after extended time AND when on ground
     if (this.stateTimer > BIRD_STATE_DURATION.HOPPING) {
         if (!this.hopData || this.hopData.phase === "ground") {
-            // Exit to flying or perching
-            if (Math.random() < 0.3) {
+            // Exit to flying or perching (don't reset timer - let it naturally end)
+            if (Math.random() < 0.7) {
                 this.findPerch();
             } else {
-                // Just move to a new area and continue hopping
+                this.state = BIRD_STATES.IDLE;
                 this.stateTimer = 0;
-                
-                // Reset hop data to restart with fresh sequence
-                this.hopData = null;
-                
-                debugLog("Bird continuing to hop in new area");
+                debugLog("Bird finished hopping, now idle");
             }
-        } else {
-            // Not ready to exit yet - reset timer and continue
-            this.stateTimer = 0;
-            debugLog("Extending hopping state until hop completes");
         }
+        // If mid-hop, let it finish the current hop naturally without resetting timer
     }
     break;
 
@@ -14475,20 +14518,24 @@ const spawnPondBtn = document.getElementById('spawnPondBtn');
 spawnPondBtn.addEventListener('click', () => {
     // Create pond at random location
     const x = 100 + Math.random() * (canvas.width - 200);
-    const y = canvas.height * GROUND_HEIGHT_RATIO;
+    const width = 80 + Math.random() * 40;
+    const height = 40 + Math.random() * 20;
+
+    // Position pond so top edge aligns with ground (appears to be in the ground)
+    const y = canvas.height * GROUND_HEIGHT_RATIO + height / 2;
 
     if (!ponds) ponds = [];
 
     ponds.push({
         x: x,
         y: y,
-        width: 80 + Math.random() * 40,
-        height: 40 + Math.random() * 20,
+        width: width,
+        height: height,
         rippleTimer: 0,
         ripples: []
     });
 
-    debugLog(`Pond spawned at (${x}, ${y})`);
+    debugLog(`Pond spawned at (${x}, ${y}), size: ${width}x${height}`);
 });
 
 // Spawn a frog
@@ -14533,12 +14580,12 @@ spawnKoiBtn.addEventListener('click', () => {
 // Trigger rainbow manually
 const triggerRainbowBtn = document.getElementById('triggerRainbowBtn');
 triggerRainbowBtn.addEventListener('click', () => {
-    if (typeof checkForRainbow === 'function') {
-        // Set conditions for rainbow
-        wasRaining = true;
-        isRaining = false;
-        checkForRainbow();
+    if (typeof createRainbow === 'function') {
+        // Directly create rainbow regardless of conditions
+        createRainbow();
         debugLog("Rainbow triggered manually");
+    } else {
+        debugLog("createRainbow function not found");
     }
 });
 
