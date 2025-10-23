@@ -277,7 +277,7 @@
       
         <div class="control-panel" id="controlPanel">
             <div style="text-align: right; margin-bottom: 10px;">
-                <button id="keepVisualsBtn">👁️ Close(Keep Debug Visuals "C" to bring panel back)</button>
+                <button id="keepVisualsBtn">👁️ Close ("C" to bring panel back)</button>
             </div>
             <button id="addBirdBtn">🐦 Add Bird</button>
             <button id="addFoodBtn">🌽 Scatter Food</button>
@@ -319,10 +319,8 @@
             <h3>🎯 Basic Interactions</h3>
             <ul>
                 <li><strong>Click/Tap anywhere:</strong> Drop food for the birds</li>
-                <li><strong>T key:</strong> Toggle debug visuals (shows paths, states)</li>
-                <li><strong>D key:</strong> Advanced debugging with performance stats</li>
                 <li><strong>C key:</strong> Restore control panel if closed</li>
-                <li><strong>Sun/Moon icon:</strong> Praise to access debug controls</li>
+                <li><strong>Sun/Moon icon:</strong> Access controls</li>
             </ul>
         </div>
 
@@ -469,7 +467,7 @@
 
     <script>
         // V38 // GAMEBOY BROUGHT BY OWL / 1BIT WINDOW LINK ADDED 
-        //  - GROUND HOPPING wip // KING RAINBOWBIRD // PRAISE THE SUN / MOON FOR DEBUG MODE ACCESS DESKTOP
+        //  - GROUND HOPPING wip // KING RAINBOWBIRD
         // // MUSHROOMS ADDED // need to fix mushroom mode SC drawings.... // SMALLER FOOD - LARGER LIMIT 
         // ANTS // HD SCREEN STRECH (?) // BALANCED TO BE MORE CHILL 
         // SCREEN SHOT / OWLS - NEED TO FIX OWL/RAT BEHAVIOR and WINDCHIMES 
@@ -1892,7 +1890,7 @@ if (rainsCompleted >= 5 && ponds.length === 0) {
     const pondX = 100 + Math.random() * (canvas.width - 200);
     const pondWidth = 100 + Math.random() * 60;
     const pondHeight = 50 + Math.random() * 30;
-    const pondY = canvas.height * GROUND_HEIGHT_RATIO + pondHeight / 2;
+    const pondY = canvas.height * GROUND_HEIGHT_RATIO;
 
     ponds.push({
         x: pondX,
@@ -2225,16 +2223,8 @@ if (isTabVisible) {
         // Draw ponds (permanent water features)
         function drawPonds() {
             ponds.forEach(pond => {
-                // Pond base (darker, more permanent looking than puddles)
-                const gradient = ctx.createRadialGradient(
-                    pond.x, pond.y, 0,
-                    pond.x, pond.y, pond.width
-                );
-                gradient.addColorStop(0, mushroomMode ? getMushroomColor('rgba(60, 120, 200, 0.9)') : 'rgba(60, 120, 200, 0.9)');
-                gradient.addColorStop(0.7, mushroomMode ? getMushroomColor('rgba(40, 100, 180, 0.8)') : 'rgba(40, 100, 180, 0.8)');
-                gradient.addColorStop(1, mushroomMode ? getMushroomColor('rgba(20, 80, 160, 0.5)') : 'rgba(20, 80, 160, 0.5)');
-
-                ctx.fillStyle = gradient;
+                // Pond base - simplified solid colors for better performance
+                ctx.fillStyle = mushroomMode ? getMushroomColor('rgba(50, 110, 190, 0.85)') : 'rgba(50, 110, 190, 0.85)';
                 ctx.beginPath();
                 ctx.ellipse(pond.x, pond.y, pond.width, pond.height, 0, 0, Math.PI * 2);
                 ctx.fill();
@@ -2245,8 +2235,9 @@ if (isTabVisible) {
                 ctx.ellipse(pond.x - pond.width * 0.2, pond.y - pond.height * 0.3, pond.width * 0.3, pond.height * 0.2, 0, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Draw ripples
-                pond.ripples.forEach(ripple => {
+                // Draw ripples - limit to visible ripples for performance
+                const visibleRipples = pond.ripples.slice(0, 5);
+                visibleRipples.forEach(ripple => {
                     const opacity = 1 - ripple.age / ripple.maxAge;
                     ctx.strokeStyle = `rgba(255, 255, 255, ${opacity * 0.3})`;
                     ctx.lineWidth = 2;
@@ -2267,8 +2258,8 @@ if (isTabVisible) {
                     return ripple.age < ripple.maxAge;
                 });
 
-                // Occasionally add ripples
-                if (Math.random() < 0.01) {
+                // Occasionally add ripples - reduced frequency and limit count for performance
+                if (Math.random() < 0.005 && pond.ripples.length < 8) {
                     pond.ripples.push({
                         x: pond.x + (Math.random() - 0.5) * pond.width,
                         y: pond.y + (Math.random() - 0.5) * pond.height,
@@ -14490,7 +14481,7 @@ if (antHill) {
                 const pondWidth = 80 + Math.random() * 40;
                 const pondHeight = 50 + Math.random() * 30;
                 const pondX = 100 + Math.random() * (canvas.width - 200);
-                const pondY = canvas.height * GROUND_HEIGHT_RATIO - pondHeight / 2;
+                const pondY = canvas.height * GROUND_HEIGHT_RATIO;
 
                 ponds.push({
                     x: pondX,
@@ -14514,7 +14505,7 @@ if (antHill) {
                 // Add 1 frog to the pond
                 frogs.push({
                     x: pondX + (Math.random() - 0.5) * pondWidth * 0.8,
-                    y: pondY + (Math.random() - 0.5) * pondHeight * 0.8,
+                    y: canvas.height * GROUND_HEIGHT_RATIO,
                     jumping: false,
                     jumpTimer: 0,
                     tongueOut: false,
