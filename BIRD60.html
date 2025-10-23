@@ -194,6 +194,13 @@
             <button id="toggleWindChimeBtn">🔔 Wind Chimes: OFF</button>
             <button id="toggleMushroomModeBtn">🍄 Mushroom Mode</button>
             <button id="spawnGameboyBtn">🎮 Spawn Gameboy</button>
+            <button id="triggerPeckingBtn">🍽️ Trigger Pecking</button>
+            <button id="testChirpBtn">🎵 Test Chirps</button>
+            <button id="addRatBtn">🐀 Add Rat</button>
+            <button id="spawnPondBtn">💧 Spawn Pond</button>
+            <button id="spawnFrogBtn">🐸 Spawn Frog</button>
+            <button id="spawnKoiBtn">🐟 Spawn Koi</button>
+            <button id="triggerRainbowBtn">🌈 Trigger Rainbow</button>
         </div>
 
     <div id="screenshotMessage" class="screenshot-message">Screenshot saved!</div>
@@ -633,21 +640,33 @@ function updateBirdTrails() {
         const minuteFraction = timeOfDayFraction - Math.floor(timeOfDayFraction);
         const minutes = Math.floor(minuteFraction * 60);
         
+        // Update history maxes
+        maxTreesEver = Math.max(maxTreesEver, trees.length);
+        maxBirdsEver = Math.max(maxBirdsEver, birds.length);
+        maxSquirrelsEver = Math.max(maxSquirrelsEver, squirrels.length);
+        maxRatsEver = Math.max(maxRatsEver, rats.length);
+        maxWormsEver = Math.max(maxWormsEver, worms.length);
+        maxFlowersEver = Math.max(maxFlowersEver, flowers.length);
+        maxNestsEver = Math.max(maxNestsEver, nests.length);
+
         statsDisplay.innerHTML = `
-    <strong>Entities:</strong>
+    <strong>Entities (Current / Max):</strong>
     <ul>
-        <li>Trees: ${trees.length}</li>
-        <li>Birds: ${birds.length}</li>
-        <li>Baby Birds: ${babyBirds.length}</li>
-        <li>Nests: ${nests.length}</li>
+        <li>Trees: ${trees.length} / ${maxTreesEver}</li>
+        <li>Birds: ${birds.length} / ${maxBirdsEver}</li>
+        <li>Baby Birds: ${babyBirds.length} (Total Born: ${totalBabiesBorn})</li>
+        <li>Nests: ${nests.length} / ${maxNestsEver}</li>
         <li>Birdhouses: ${birdhouses.length}</li>
-        <li>Worms: ${worms.length}</li>
+        <li>Worms: ${worms.length} / ${maxWormsEver}</li>
         <li>Twigs: ${twigs.length}</li>
-        <li>Rats: ${rats.length}</li>
-        <li>Squirrels: ${squirrels.length}</li>
+        <li>Rats: ${rats.length} / ${maxRatsEver}</li>
+        <li>Squirrels: ${squirrels.length} / ${maxSquirrelsEver}</li>
         <li>Puddles: ${puddles.length}</li>
+        <li>Ponds: ${ponds.length}</li>
+        <li>Frogs: ${frogs.length}</li>
+        <li>Koi: ${koi.length}</li>
         <li>Food: ${foodItems.length}</li>
-        <li>Flowers: ${flowers.length}</li>
+        <li>Flowers: ${flowers.length} / ${maxFlowersEver}</li>
     </ul>
     <strong>Time:</strong> ${timeOfDay < 1 ? 'Day' : 'Night'} (${displayHour12}:${minutes.toString().padStart(2, '0')} ${amPm})<br>
     <strong>Weather:</strong> ${isRaining ? (isThundering ? 'Thunderstorm' : 'Raining') : 'Clear'}<br>
@@ -997,6 +1016,9 @@ const RAT_KING_OWL_ATTRACTION = 0.2; // Higher chance of owl spawning when rat k
         let nests = [];
         let birdhouses = [];
         let puddles = [];
+        let ponds = []; // Array for permanent ponds
+        let frogs = []; // Array for frogs
+        let koi = []; // Array for koi fish
         let flowers = []; // Array for flowers
         let specialEffects = []; // Added for special visual effects
         let crows = [];
@@ -1010,6 +1032,15 @@ let ants = [];
 
         let isTabVisible = true; // Add this line here
         let totalBabiesBorn = 0; // Track total babies born counter
+
+        // History tracking - maximum counts ever seen
+        let maxTreesEver = 0;
+        let maxBirdsEver = 0;
+        let maxSquirrelsEver = 0;
+        let maxRatsEver = 0;
+        let maxWormsEver = 0;
+        let maxFlowersEver = 0;
+        let maxNestsEver = 0;
 
         let mushroomMode = false;
 let colorCycleTimer = 0;
@@ -1853,16 +1884,16 @@ if (isTabVisible) {
                 gradient.addColorStop(0, `rgba(130, 170, 255, ${puddle.depth})`);
                 gradient.addColorStop(0.6, `rgba(100, 150, 255, ${puddle.depth * 0.8})`);
                 gradient.addColorStop(1, `rgba(80, 120, 255, 0)`);
-                
+
                 ctx.fillStyle = gradient;
                 ctx.beginPath();
                 ctx.ellipse(
-                    puddle.x, puddle.y, 
-                    puddle.size, puddle.size * 0.3, 
+                    puddle.x, puddle.y,
+                    puddle.size, puddle.size * 0.3,
                     0, 0, Math.PI * 2
                 );
                 ctx.fill();
-                
+
                 // Draw ripples
                 puddle.ripples.forEach(ripple => {
                     const opacity = 1 - ripple.size / ripple.maxSize;
@@ -1876,6 +1907,209 @@ if (isTabVisible) {
                     );
                     ctx.stroke();
                 });
+            });
+        }
+
+        // Draw ponds (permanent water features)
+        function drawPonds() {
+            ponds.forEach(pond => {
+                // Pond base (darker, more permanent looking than puddles)
+                const gradient = ctx.createRadialGradient(
+                    pond.x, pond.y, 0,
+                    pond.x, pond.y, pond.width
+                );
+                gradient.addColorStop(0, mushroomMode ? getMushroomColor('rgba(60, 120, 200, 0.9)') : 'rgba(60, 120, 200, 0.9)');
+                gradient.addColorStop(0.7, mushroomMode ? getMushroomColor('rgba(40, 100, 180, 0.8)') : 'rgba(40, 100, 180, 0.8)');
+                gradient.addColorStop(1, mushroomMode ? getMushroomColor('rgba(20, 80, 160, 0.5)') : 'rgba(20, 80, 160, 0.5)');
+
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.ellipse(pond.x, pond.y, pond.width, pond.height, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Reflections/highlights
+                ctx.fillStyle = mushroomMode ? getMushroomColor('rgba(200, 220, 255, 0.3)') : 'rgba(200, 220, 255, 0.3)';
+                ctx.beginPath();
+                ctx.ellipse(pond.x - pond.width * 0.2, pond.y - pond.height * 0.3, pond.width * 0.3, pond.height * 0.2, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Draw ripples
+                pond.ripples.forEach(ripple => {
+                    const opacity = 1 - ripple.age / ripple.maxAge;
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${opacity * 0.3})`;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.ellipse(ripple.x, ripple.y, ripple.size, ripple.size * 0.5, 0, 0, Math.PI * 2);
+                    ctx.stroke();
+                });
+            });
+        }
+
+        // Update ponds
+        function updatePonds(deltaTime) {
+            ponds.forEach(pond => {
+                // Update ripples
+                pond.ripples = pond.ripples.filter(ripple => {
+                    ripple.age += deltaTime;
+                    ripple.size += deltaTime * 0.05;
+                    return ripple.age < ripple.maxAge;
+                });
+
+                // Occasionally add ripples
+                if (Math.random() < 0.01) {
+                    pond.ripples.push({
+                        x: pond.x + (Math.random() - 0.5) * pond.width,
+                        y: pond.y + (Math.random() - 0.5) * pond.height,
+                        size: 5,
+                        age: 0,
+                        maxAge: 2000
+                    });
+                }
+            });
+        }
+
+        // Draw koi fish
+        function drawKoi() {
+            koi.forEach(fish => {
+                const pond = ponds[fish.pondIndex];
+                if (!pond) return;
+
+                // Koi body
+                ctx.save();
+                ctx.translate(fish.x, fish.y);
+                ctx.rotate(fish.swimAngle);
+
+                // Body gradient
+                const bodyGradient = ctx.createLinearGradient(-10, 0, 10, 0);
+                bodyGradient.addColorStop(0, mushroomMode ? getMushroomColor(fish.color) : fish.color);
+                bodyGradient.addColorStop(0.5, mushroomMode ? getMushroomColor('#FFFFFF') : '#FFFFFF');
+                bodyGradient.addColorStop(1, mushroomMode ? getMushroomColor(fish.color) : fish.color);
+
+                ctx.fillStyle = bodyGradient;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 12, 5, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Tail
+                ctx.fillStyle = mushroomMode ? getMushroomColor(fish.color) : fish.color;
+                ctx.beginPath();
+                ctx.moveTo(-12, 0);
+                ctx.lineTo(-18, -6);
+                ctx.lineTo(-18, 6);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.restore();
+            });
+        }
+
+        // Update koi
+        function updateKoi(deltaTime) {
+            koi.forEach(fish => {
+                const pond = ponds[fish.pondIndex];
+                if (!pond) return;
+
+                // Swim in circular pattern within pond
+                fish.swimAngle += deltaTime * 0.001;
+                const radius = Math.min(pond.width, pond.height) * 0.6;
+                fish.x = pond.x + Math.cos(fish.swimAngle * 2) * radius * 0.7;
+                fish.y = pond.y + Math.sin(fish.swimAngle * 2) * radius * 0.4;
+
+                // Occasionally create ripple
+                if (Math.random() < 0.02) {
+                    pond.ripples.push({
+                        x: fish.x,
+                        y: fish.y,
+                        size: 3,
+                        age: 0,
+                        maxAge: 1500
+                    });
+                }
+            });
+        }
+
+        // Draw frogs
+        function drawFrogs() {
+            frogs.forEach(frog => {
+                // Frog body
+                ctx.fillStyle = mushroomMode ? getMushroomColor('#4CAF50') : '#4CAF50';
+                ctx.beginPath();
+                ctx.ellipse(frog.x, frog.y, 8, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Eyes
+                ctx.fillStyle = mushroomMode ? getMushroomColor('#FFD700') : '#FFD700';
+                ctx.beginPath();
+                ctx.arc(frog.x - 3, frog.y - 4, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(frog.x + 3, frog.y - 4, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Pupils
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(frog.x - 3, frog.y - 4, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(frog.x + 3, frog.y - 4, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Tongue if out
+                if (frog.tongueOut && frog.tongueTarget) {
+                    ctx.strokeStyle = mushroomMode ? getMushroomColor('#FF6B9D') : '#FF6B9D';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(frog.x, frog.y);
+                    ctx.lineTo(frog.tongueTarget.x, frog.tongueTarget.y);
+                    ctx.stroke();
+                }
+            });
+        }
+
+        // Update frogs
+        function updateFrogs(deltaTime) {
+            frogs.forEach(frog => {
+                // Jump occasionally
+                if (!frog.jumping && Math.random() < 0.002) {
+                    frog.jumping = true;
+                    frog.jumpTimer = 0;
+                    frog.jumpStartX = frog.x;
+                    frog.jumpStartY = frog.y;
+                    frog.jumpTargetX = frog.x + (Math.random() - 0.5) * 100;
+                    frog.jumpTargetY = frog.y + (Math.random() - 0.5) * 20;
+                    debugLog(`Frog jumping from (${frog.x.toFixed(0)}, ${frog.y.toFixed(0)})`);
+                }
+
+                if (frog.jumping) {
+                    frog.jumpTimer += deltaTime;
+                    const progress = Math.min(1, frog.jumpTimer / 500);
+                    frog.x = frog.jumpStartX + (frog.jumpTargetX - frog.jumpStartX) * progress;
+                    frog.y = frog.jumpStartY + (frog.jumpTargetY - frog.jumpStartY) * progress - Math.sin(progress * Math.PI) * 20;
+
+                    if (progress >= 1) {
+                        frog.jumping = false;
+                    }
+                }
+
+                // Try to catch nearby insects
+                if (!frog.tongueOut && Math.random() < 0.005) {
+                    const nearbyAnts = ants.filter(ant => distance(frog.x, frog.y, ant.x, ant.y) < 50);
+                    if (nearbyAnts.length > 0) {
+                        frog.tongueOut = true;
+                        frog.tongueTarget = nearbyAnts[0];
+                        setTimeout(() => {
+                            frog.tongueOut = false;
+                            frog.tongueTarget = null;
+                            // Remove ant if caught
+                            if (Math.random() < 0.3) {
+                                const index = ants.indexOf(nearbyAnts[0]);
+                                if (index !== -1) ants.splice(index, 1);
+                                debugLog(`Frog caught an ant!`);
+                            }
+                        }, 200);
+                    }
+                }
             });
         }
 
@@ -5399,8 +5633,8 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                     intensity: intensity
                 });
 
-                // Play audio if wind chimes enabled
-                if (windChimeEnabled && audioContext) {
+                // Play audio (independent of wind chimes - chirps should always play!)
+                if (audioContext) {
                     const notes = {
                         [CHIRP_TYPES.SOCIAL]: ['C4'],
                         [CHIRP_TYPES.FOOD_CALL]: ['G4', 'C5'],
@@ -5575,8 +5809,10 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                 // Social facilitation - peck faster in groups
                 if (nearbyFeeding.length > 0) {
                     this.peckingInterval = PECKING_INTERVAL_GROUP;
+                    debugLog(`${this.birdType.name} started pecking in group (${nearbyFeeding.length} nearby) at (${this.x.toFixed(0)}, ${this.y.toFixed(0)})`);
                 } else {
                     this.peckingInterval = PECKING_INTERVAL_SOLO;
+                    debugLog(`${this.birdType.name} started solo pecking at (${this.x.toFixed(0)}, ${this.y.toFixed(0)})`);
                 }
             }
 
@@ -5597,6 +5833,9 @@ if (timeOfDay < 1 && Math.random() < 0.001) {
                     if (nearbyFood) {
                         this.hunger = Math.max(0, this.hunger - 50);
                         foodItems.splice(foodItems.indexOf(nearbyFood), 1);
+                        debugLog(`${this.birdType.name} pecked and consumed food at (${this.x.toFixed(0)}, ${this.y.toFixed(0)})`);
+                    } else {
+                        debugLog(`${this.birdType.name} pecked ground (no food) at (${this.x.toFixed(0)}, ${this.y.toFixed(0)})`);
                     }
                 }
 
@@ -11279,8 +11518,8 @@ function drawRainbow() {
         ctx.stroke();
     }
     
-    if (rainbowOpacity > 0.5 && Math.random() < 0.3) { // Add probability check
-    const shimmerCount = 3 + Math.floor(Math.random() * 3); // Reduce count
+    if (rainbowOpacity > 0.5 && Math.random() < 0.05) { // Reduced from 0.3 to 0.05 - much slower shimmer
+    const shimmerCount = 2 + Math.floor(Math.random() * 2); // Reduced count from 3+3 to 2+2
     
     for (let i = 0; i < shimmerCount; i++) {
         const shimmerX = canvasCenter - rainbowWidth / 2 + Math.random() * rainbowWidth;
@@ -12550,35 +12789,35 @@ function drawAnts() {
         // V26: Reduced squirrel spawn rate
         function spawnSquirrels() {
             if (squirrels.length >= MAX_SQUIRRELS) return;
-            
-            if (Math.random() < 0.005) { // Reduced from 0.01
+
+            if (Math.random() < 0.02) { // Increased from 0.005 to make squirrels more common
                 const x = Math.random() < 0.5 ? -30 : canvas.width + 30;
                 const y = canvas.height * GROUND_HEIGHT_RATIO - 5;
-                
+
                 const squirrel = new Squirrel(x, y);
                 // Set initial direction based on entry point
                 squirrel.direction = x < 0 ? 1 : -1;
-                
+
                 squirrels.push(squirrel);
                 debugLog(`Squirrel spawned at (${x}, ${y})`);
             }
         }
 
-        // V26: Reduced rat spawn rate
+        // V26: Increased rat spawn rate for better visibility
         function spawnRats() {
             if (rats.length >= MAX_RATS) return;
-            
-            if (Math.random() < 0.02) { // Reduced from 0.03
+
+            if (Math.random() < 0.04) { // Increased from 0.02 to make rats more common
                 const x = Math.random() < 0.5 ? -30 : canvas.width + 30;
                 const y = canvas.height * GROUND_HEIGHT_RATIO;
-                
+
                 // Reduced chance to spawn a rat king
                 const isRatKing = rats.length > 0 && Math.random() < RAT_KING_FORMATION_CHANCE; // Reduced from 0.2 to 0.15
-                
+
                 // Create rat
                 const rat = new Rat(x, y, isRatKing);
                 rats.push(rat);
-                
+
                 debugLog(`${isRatKing ? 'Rat king' : 'Rat'} spawned at (${x}, ${y})`);
             }
         }
@@ -13081,7 +13320,79 @@ function spawnOwls() {
     
     debugLog("Wind chimes disabled due to timeout");
 }
-        
+
+        // Draw visual music notes for chirps (accessibility feature for hearing impaired)
+        function drawChirpMusicNotes(now) {
+            activeChirps.forEach(chirp => {
+                const age = now - chirp.timestamp;
+                const maxAge = 2000;
+                const progress = age / maxAge;
+
+                // Fade out and float up
+                const opacity = 1 - progress;
+                const floatUp = progress * 30;
+
+                // Different note styles based on chirp type
+                let noteSymbol = '♪';
+                let noteColor = '#000000';
+                let noteSize = 16;
+
+                switch(chirp.type) {
+                    case CHIRP_TYPES.SOCIAL:
+                        noteSymbol = '♪';
+                        noteColor = '#4CAF50'; // Green
+                        noteSize = 14;
+                        break;
+                    case CHIRP_TYPES.FOOD_CALL:
+                        noteSymbol = '♫';
+                        noteColor = '#FF9800'; // Orange
+                        noteSize = 18;
+                        break;
+                    case CHIRP_TYPES.CONTACT_CALL:
+                        noteSymbol = '♪';
+                        noteColor = '#2196F3'; // Blue
+                        noteSize = 12;
+                        break;
+                    case CHIRP_TYPES.ALERT:
+                        noteSymbol = '♬';
+                        noteColor = '#F44336'; // Red
+                        noteSize = 20;
+                        break;
+                    case CHIRP_TYPES.TERRITORIAL:
+                        noteSymbol = '♩';
+                        noteColor = '#9C27B0'; // Purple
+                        noteSize = 16;
+                        break;
+                    case CHIRP_TYPES.VICTORY:
+                        noteSymbol = '♫♪';
+                        noteColor = '#FFD700'; // Gold
+                        noteSize = 20;
+                        break;
+                }
+
+                // Draw music note
+                ctx.save();
+                ctx.globalAlpha = opacity;
+                ctx.font = `${noteSize}px Arial`;
+                ctx.fillStyle = noteColor;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // Add slight side-to-side wobble
+                const wobble = Math.sin(age / 100) * 3;
+
+                ctx.fillText(noteSymbol, chirp.x + wobble, chirp.y - 20 - floatUp);
+
+                // Add glow effect for intensity
+                if (chirp.intensity > 1) {
+                    ctx.shadowColor = noteColor;
+                    ctx.shadowBlur = 5 * chirp.intensity;
+                    ctx.fillText(noteSymbol, chirp.x + wobble, chirp.y - 20 - floatUp);
+                }
+
+                ctx.restore();
+            });
+        }
 
         // Update and draw all elements
         function updateAndDraw(timestamp) {
@@ -13162,6 +13473,14 @@ if (mushroomMode) {
     // Draw puddles under everything else
     updatePuddles(deltaTime);
     drawPuddles();
+
+    // Update and draw ponds, frogs, and koi
+    updatePonds(deltaTime);
+    drawPonds();
+    updateKoi(deltaTime);
+    drawKoi();
+    updateFrogs(deltaTime);
+    drawFrogs();
 
     // Draw ground elements
     drawTwigs();
@@ -13365,6 +13684,9 @@ for (let i = owls.length - 1; i >= 0; i--) {
     // === NEW BEHAVIOR SYSTEM UPDATES ===
     // Process synchronized chirping (reuse 'now' from line 13091)
     activeChirps = activeChirps.filter(chirp => now - chirp.timestamp < 2000); // Keep chirps for 2 seconds
+
+    // Draw visual music notes for chirps (accessibility feature)
+    drawChirpMusicNotes(now);
 
     // Synchronized chirping - social chirps trigger nearby birds to chirp
     if (activeChirps.length > 0 && Math.random() < 0.05) {
@@ -14098,6 +14420,125 @@ spawnGameboyBtn.addEventListener('click', () => {
         spawnGameboy();
     } else {
         debugLog("Gameboy already exists in the garden");
+    }
+});
+
+// Trigger pecking behavior for testing
+const triggerPeckingBtn = document.getElementById('triggerPeckingBtn');
+triggerPeckingBtn.addEventListener('click', () => {
+    if (birds.length > 0) {
+        const bird = birds[Math.floor(Math.random() * birds.length)];
+        bird.startPecking();
+        debugLog(`Triggered pecking for bird at (${bird.x.toFixed(0)}, ${bird.y.toFixed(0)})`);
+    } else {
+        debugLog("No birds available to trigger pecking");
+    }
+});
+
+// Test all chirp types
+const testChirpBtn = document.getElementById('testChirpBtn');
+testChirpBtn.addEventListener('click', () => {
+    if (birds.length > 0) {
+        const bird = birds[0];
+        const chirpTypes = [
+            CHIRP_TYPES.SOCIAL,
+            CHIRP_TYPES.FOOD_CALL,
+            CHIRP_TYPES.CONTACT_CALL,
+            CHIRP_TYPES.ALERT,
+            CHIRP_TYPES.TERRITORIAL,
+            CHIRP_TYPES.VICTORY
+        ];
+
+        chirpTypes.forEach((type, i) => {
+            setTimeout(() => {
+                bird.chirp(type, 1.0);
+                debugLog(`Testing chirp type: ${Object.keys(CHIRP_TYPES).find(k => CHIRP_TYPES[k] === type)}`);
+            }, i * 1000);
+        });
+    } else {
+        debugLog("No birds available to test chirps");
+    }
+});
+
+// Add a regular rat (not rat king)
+const addRatBtn = document.getElementById('addRatBtn');
+addRatBtn.addEventListener('click', () => {
+    const x = Math.random() < 0.5 ? -30 : canvas.width + 30;
+    const y = canvas.height * GROUND_HEIGHT_RATIO;
+    const rat = new Rat(x, y, false);
+    rats.push(rat);
+    debugLog(`Regular rat spawned at (${x}, ${y})`);
+});
+
+// Spawn a pond
+const spawnPondBtn = document.getElementById('spawnPondBtn');
+spawnPondBtn.addEventListener('click', () => {
+    // Create pond at random location
+    const x = 100 + Math.random() * (canvas.width - 200);
+    const y = canvas.height * GROUND_HEIGHT_RATIO;
+
+    if (!ponds) ponds = [];
+
+    ponds.push({
+        x: x,
+        y: y,
+        width: 80 + Math.random() * 40,
+        height: 40 + Math.random() * 20,
+        rippleTimer: 0,
+        ripples: []
+    });
+
+    debugLog(`Pond spawned at (${x}, ${y})`);
+});
+
+// Spawn a frog
+const spawnFrogBtn = document.getElementById('spawnFrogBtn');
+spawnFrogBtn.addEventListener('click', () => {
+    if (!frogs) frogs = [];
+
+    const x = 100 + Math.random() * (canvas.width - 200);
+    const y = canvas.height * GROUND_HEIGHT_RATIO;
+
+    frogs.push({
+        x: x,
+        y: y,
+        jumpTimer: 0,
+        tongueOut: false
+    });
+
+    debugLog(`Frog spawned at (${x}, ${y})`);
+});
+
+// Spawn a koi fish
+const spawnKoiBtn = document.getElementById('spawnKoiBtn');
+spawnKoiBtn.addEventListener('click', () => {
+    if (ponds && ponds.length > 0) {
+        if (!koi) koi = [];
+
+        const pond = ponds[0];
+        koi.push({
+            x: pond.x + pond.width / 2,
+            y: pond.y + pond.height / 2,
+            pondIndex: 0,
+            swimAngle: Math.random() * Math.PI * 2,
+            color: '#FF6B00'
+        });
+
+        debugLog(`Koi spawned in pond`);
+    } else {
+        debugLog("No ponds available - spawn a pond first!");
+    }
+});
+
+// Trigger rainbow manually
+const triggerRainbowBtn = document.getElementById('triggerRainbowBtn');
+triggerRainbowBtn.addEventListener('click', () => {
+    if (typeof checkForRainbow === 'function') {
+        // Set conditions for rainbow
+        wasRaining = true;
+        isRaining = false;
+        checkForRainbow();
+        debugLog("Rainbow triggered manually");
     }
 });
 
