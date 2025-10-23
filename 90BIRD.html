@@ -2186,20 +2186,22 @@ if (isTabVisible) {
 
         function drawPuddles() {
             puddles.forEach(puddle => {
-                // Main puddle shape
-                const gradient = ctx.createRadialGradient(
-                    puddle.x, puddle.y, 0,
-                    puddle.x, puddle.y, puddle.size
-                );
-                gradient.addColorStop(0, `rgba(130, 170, 255, ${puddle.depth})`);
-                gradient.addColorStop(0.6, `rgba(100, 150, 255, ${puddle.depth * 0.8})`);
-                gradient.addColorStop(1, `rgba(80, 120, 255, 0)`);
-
-                ctx.fillStyle = gradient;
+                // Main puddle shape - simplified for performance
+                ctx.fillStyle = `rgba(110, 150, 230, ${puddle.depth * 0.7})`;
                 ctx.beginPath();
                 ctx.ellipse(
                     puddle.x, puddle.y,
                     puddle.size, puddle.size * 0.3,
+                    0, 0, Math.PI * 2
+                );
+                ctx.fill();
+
+                // Add center highlight for depth
+                ctx.fillStyle = `rgba(150, 180, 255, ${puddle.depth * 0.4})`;
+                ctx.beginPath();
+                ctx.ellipse(
+                    puddle.x, puddle.y,
+                    puddle.size * 0.5, puddle.size * 0.15,
                     0, 0, Math.PI * 2
                 );
                 ctx.fill();
@@ -2280,20 +2282,21 @@ if (isTabVisible) {
                 // Use displayY if available (for jumping), otherwise use y
                 const drawY = fish.displayY !== undefined ? fish.displayY : fish.y;
 
-                // Koi body
+                // Koi body - simplified for performance
                 ctx.save();
                 ctx.translate(fish.x, drawY);
                 ctx.rotate(fish.swimAngle);
 
-                // Body gradient
-                const bodyGradient = ctx.createLinearGradient(-10, 0, 10, 0);
-                bodyGradient.addColorStop(0, mushroomMode ? getMushroomColor(fish.color) : fish.color);
-                bodyGradient.addColorStop(0.5, mushroomMode ? getMushroomColor('#FFFFFF') : '#FFFFFF');
-                bodyGradient.addColorStop(1, mushroomMode ? getMushroomColor(fish.color) : fish.color);
-
-                ctx.fillStyle = bodyGradient;
+                // Body - solid color with white belly highlight
+                ctx.fillStyle = mushroomMode ? getMushroomColor(fish.color) : fish.color;
                 ctx.beginPath();
                 ctx.ellipse(0, 0, 12, 5, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // White belly highlight (simple oval)
+                ctx.fillStyle = mushroomMode ? getMushroomColor('rgba(255, 255, 255, 0.6)') : 'rgba(255, 255, 255, 0.6)';
+                ctx.beginPath();
+                ctx.ellipse(0, 2, 8, 3, 0, 0, Math.PI * 2);
                 ctx.fill();
 
                 // Tail
@@ -2450,7 +2453,7 @@ if (isTabVisible) {
                         frog.jumpStartX = frog.x;
                         frog.jumpStartY = frog.y;
                         frog.jumpTargetX = jumpAwayX;
-                        frog.jumpTargetY = frog.y + (Math.random() - 0.5) * 20;
+                        frog.jumpTargetY = canvas.height * GROUND_HEIGHT_RATIO;
                         debugLog(`Frog jumping away from bird!`);
                     }
 
@@ -2476,7 +2479,7 @@ if (isTabVisible) {
                     frog.jumpStartX = frog.x;
                     frog.jumpStartY = frog.y;
                     frog.jumpTargetX = frog.x + (Math.random() - 0.5) * 100;
-                    frog.jumpTargetY = frog.y + (Math.random() - 0.5) * 20;
+                    frog.jumpTargetY = canvas.height * GROUND_HEIGHT_RATIO;
                     debugLog(`Frog jumping from (${frog.x.toFixed(0)}, ${frog.y.toFixed(0)})`);
                 }
 
@@ -2497,16 +2500,25 @@ if (isTabVisible) {
                     if (nearbyAnts.length > 0) {
                         frog.tongueOut = true;
                         frog.tongueTarget = nearbyAnts[0];
-                        setTimeout(() => {
-                            frog.tongueOut = false;
-                            frog.tongueTarget = null;
-                            // Remove ant if caught
-                            if (Math.random() < 0.3) {
-                                const index = ants.indexOf(nearbyAnts[0]);
-                                if (index !== -1) ants.splice(index, 1);
+                        frog.tongueTimer = 0;
+                        frog.tongueTargetIndex = ants.indexOf(nearbyAnts[0]);
+                    }
+                }
+
+                // Update tongue animation
+                if (frog.tongueOut) {
+                    frog.tongueTimer += deltaTime;
+                    if (frog.tongueTimer >= 200) {
+                        // Try to catch the ant
+                        if (Math.random() < 0.3 && frog.tongueTargetIndex !== -1) {
+                            if (ants[frog.tongueTargetIndex] === frog.tongueTarget) {
+                                ants.splice(frog.tongueTargetIndex, 1);
                                 debugLog(`Frog caught an ant!`);
                             }
-                        }, 200);
+                        }
+                        frog.tongueOut = false;
+                        frog.tongueTarget = null;
+                        frog.tongueTargetIndex = -1;
                     }
                 }
             });
